@@ -1,0 +1,269 @@
+---
+title: "One potential solution to the short exercise on instrumental variables"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+library(ggplot2)
+library(AER)
+```
+
+In this document, I will provide one potential solution to the in-class exercise on using IVs.
+
+# Data generation
+
+This is the data generating process (DGP) for the data that you got.
+
+```{r}
+#| label: data-generation
+
+# Set the seed for reproducibility
+set.seed(123)
+
+# Generate z and v as two independent random variables
+z <- rnorm(400, 0, 5)
+v <- rnorm(400, 0, 5)
+
+# Generate x that is related to both z and v plus some independent (random) part
+x <- 0.5*z + v + rnorm(400, 0, 5)
+
+# Generate y that is related to both x and v plus some independent (random) error component
+y <- 50 + x + v + rnorm(400, 0, 5)
+
+df <- data.frame(cbind(y,x,z,v))
+```
+
+*Note: You only got data on Y, X and Z. The variable V is unobserved to you. It is an unobserved or hidden confounder of the relationship between X and Y.* 
+
+# Estimating the OLS models
+
+## The long regression
+
+*Note: You cannot do this because you do not have v included in your dataset. Thus, this long-regression is hypothetical: if we would have all unobserved causes ...*
+
+Here, you can see that we do not have endogeneity / omitted variable bias, because the model is correctly specified.
+
+*Note: z is not a predictor of y and should not be included in the long regression.*
+
+```{r}
+lm.long <- lm(y~x+v, data=df)
+
+tab_model(lm.long, show.se = TRUE)
+```
+
+The regression coefficient of `x` is close to 1 (the population parameter).
+If we would run a simulation (repeatedly sampling from the DGP; e.g. 1000 times) the average estimate of `x` would approach 1 (it would be unbiased).
+
+## The short regression
+
+Here, we have endogeneity / omitted variable bias, because v is missing.
+
+```{r}
+lm.short <- lm(y~x, data=df)
+
+tab_model(lm.short, show.se = TRUE)
+```
+
+The regression coefficient of `x` is different from 1 (the population parameter), i.e., it is biased.
+
+---
+
+We can also calculate the bias as "Short equals long plus the effect of omitted times the regression of omitted on included." (Joshua Angrist)
+
+Of course, we can only do this calculation here because we know `v`. 
+
+In reality, and in the dataset you got, you are not be able to calculate the bias because you do not know the effect of the omitted variable 'v'.
+
+The bias is given by $\beta_2 \cdot \delta_1$ with $v = \delta_0+ \delta_1 x + \xi$
+
+$\beta_2$ is `r coef(lm.long)[3]`  *(effect of v)*
+
+$\delta_1$ is `r coef(lm(v~x))[2]`  *(effect of x on v)*
+
+Bias: $\beta_2 \cdot \delta_1$ = `r coef(lm.long)[3]*coef(lm(v~x))[2]`
+
+---
+
+# Estimating the IV models
+
+1) We will estimate the 2SLS model 'by hand', i.e., we will be constructing the first stage and second stage model. 
+
+2) We will estimate the 2SLS model using a pre-existing package (ivreg).
+
+3) We will calculate the Wald IV estimator.
+
+4) We will estimate yet another version of the IV model: the control function approach.
+
+*We can compare the outcomes. They should be the same for the parameter estimate but differ in the standard errors.*
+
+## Manual 2SLS approach - The first stage regression
+
+In the first stage `x` is the dependent variable and `z` (the instrument) the independent variable.
+
+We extract the predicted values `x.hat` from this first stage and add them to the data frame.
+
+```{r}
+lm.first <- lm(x~z, data=df)
+
+x.hat <- predict(lm.first)
+
+df <- cbind(df, x.hat)
+
+tab_model(lm.first, show.se = TRUE)
+```
+
+The F-statistic is `r round(summary(lm.first)$fstatistic[1],2)` in this case, which indicates sufficient strength of the instrumental variable (substantially larger than 10).
+
+```{r}
+anova(lm.first)
+```
+
+## Manual 2SLS approach - The second stage regression
+
+We use the predicted values from the first stage `x.hat` instead of `x` to estimate the effect of x on y.
+
+```{r}
+lm.second <- lm(y~x.hat, data=df)
+
+tab_model(lm.second, show.se = TRUE)
+```
+
+The regression coefficient of `x.hat` is again getting close to 1 (the population parameter).
+
+## The 2SLS approach using the ivreg function
+
+We now use the popular ivreg function from the AER package that also estimates the IV model using 2SLS.
+
+```{r}
+lm.ivreg <- AER::ivreg(y~x|z, data = df)
+
+tab_model(lm.ivreg, show.se = TRUE)
+```
+
+As we can see, the coefficient estimate of `x` is the same as that from our manual two-stage approach. However, the standard errors are different, because we ignore the uncertainty of using estimated quantities (i.e., `x.hat`) in the second stage. The ivreg function calculates correct standard errors (and confidence intervals), while the manual approach does not provide correct standard errors.
+
+*We use the manual approach only for understanding the process, but usually not for actually estimating models. For those, we should prefer high quality packages.*
+
+The original summary function of ivreg (which doesn't plot nicely) has some additional diagnostics that come handy. It includes the F-test for the strength of the instruments (see above) as well as the Wu-Hausman test for endogeneity and the Sargan test for overidentification.
+
+```{r}
+summary(lm.ivreg, diagnostics = TRUE)
+```
+
+## The Wald IV approach
+
+We discussed this approach in the context of non-compliance. The basic formulation uses a binary endogenous variable (e.g., exposure) and a binary instrumental variable (e.g., randomized treatment assignment).
+
+$$LATE\ =\ \frac{\mathbb{E}[Y_i | Z_i=1] - \mathbb{E}[Y_i | Z_i=0]} {\mathbb{E}[X_i=1 | Z_i=1] - \mathbb{E}[X_i=1 | Z_i=0]}$$
+Where the numerator represents the effect of the instrument Z on the outcome and the denominator represents the effect of the instrument Z on X (the endogenous variable). If the instrument is not binary this equation generalizes to the following equation.
+
+$$ \beta_{IV}\ =\ \frac{Cov(Z,Y)}{Cov(Z,X)}$$
+In both cases the denominator is the first stage in 2SLS.
+
+```{r}
+
+lm.itt <- lm(y~z, data=df)
+
+# Using regression coefficients from simple regressions
+coef(lm.itt)[2]/coef(lm.first)[2]
+
+# Using covariances
+var(df$z, df$y)/var(df$z, df$x)
+```
+
+
+## The control function approach
+
+For the control function approach we vary the second stage regression. We can use the results from the first stage model, but need to extract the residuals instead of the predicted values.
+
+```{r}
+# Extract residual from first stage model
+res.first <- residuals(lm.first)
+df <- cbind(df, res.first)
+
+# Specify the control function model
+lm.control <- lm(y~x+res.first, data=df)
+
+tab_model(lm.control, show.se = TRUE)
+```
+
+The coefficient estimate for `x` is again the same as for the previous methods. However, the standard errors differ.
+
+**Note:** As with the manual two-stage approach, the standard errors from this second stage regression are not correct. Please see for example Papies et al. (2017) on how to calculate correct standard errors for this approach.
+
+## Summary
+
+All three (four) approaches provide the same IV estimate for the effect of X.
+
+They basically all use the same first stage regression (which represents the instrument strength: the effect of Z on X).
+
+They differ in how they build the second stage. The Wald IV estimate has typically on theoretical relevance as it nicely highlights the relationship towards LATE in a non-compliance context. It also shows that you could estimate the LATE in such a context with 2SLS and functions such as ivreg that allow you to get standard error estimates.
+
+---
+
+# The fit of the instrumental variable regresion line or IVs and prediction
+
+We can already see from the difference in R-square between the "short regression" and the "second stage regression" that the instrumental variable line has much lower (in-sample) fit.
+
+```{r}
+summary(lm.short)$r.squared
+summary(lm.ivreg)$r.squared
+```
+
+We can also illustrate this using a scatter plot
+
+```{r}
+ggplot(data = df, aes(x = x, y = y)) +
+  geom_point() +
+  geom_abline(intercept = coef(lm.short)[1], slope = coef(lm.short)[2], linetype = "dashed", color = "blue") +
+  geom_abline(intercept = coef(lm.second)[1], slope = coef(lm.second)[2], linetype = "dotted", color = "red") +
+  theme_classic()
+```
+
+The blue dashed line fits the data points better than the red dotted line which is corrected for endogeneity bias. While the red line is the causally correct effect, it is not representing the data well, which shows confounding.
+
+In stats 101 you should have learned that OLS regression is the best linear predictor of Y. There is no better *linear* model. This is true regardless of whether X is endogenous or not. Indeed, from a predictive perspective, endogeneity is a feature not a bug! In our example, X contains additional information (variance) from V that makes predicting Y better than if we would remove this variance on focus only on the pure effect of X. However, from a causal perspective we are interested in only the effect of X (without V). But from a predictive perspective using as much information as possible is the best.
+
+Likewise, the IV model would be a worse predictive model out-of-sample. As long as we are not able to include the omitted variable `v`, it is better to use the uncorrected `x` for prediction, because it captures some of the effects of `v` providing better predicted values than the "true" population effect of `x`, which we try to obtain from the IV model.
+
+
+# What happens if we use the IV as a control
+
+In this last section, I will show that using Z as a control is not a good idea. Actually, it is a very bad idea.
+
+Let us start with using Z as a control instead of an instrument. We use the short form regression and simply add Z.
+
+```{r}
+lm.bad1 <- lm(y~x+z, data=df)
+
+tab_model(lm.bad1, show.se = TRUE)
+```
+
+The coefficient of `x` is not close to 1. Actually, it is even further away from 1 than in the short regression, where it was `r coef(lm.short)[2]`
+
+We have seen this model before when we discussed bad control variables.
+
+The intuition is relatively simple (the math more complicated): The intuition for the control function approach is that we are using the bad variance of X as a control (the variance that is endogenous). This will make the effect of X focusing on the good variance (the one that is exogenous). Here it is the opposite. We use the good variance of X as a control (through the exogenous part in Z). This will make the effect of X focus on the bad variance (the one that is endogenous). This will inflate the endogeneity bias even further. In our case, pushing the coefficient away from 1.
+
+---
+
+Another bad idea is to add Z as a control into the second stage regression.
+
+```{r}
+lm.bad2 <- lm(y~x.hat+z, data=df)
+
+tab_model(lm.bad2, show.se = TRUE)
+```
+
+The problem here is that x.hat and Z are perfectly collinear because x.hat is the prediction created out of Z. We only want to focus on the part of Z that is related to X. That is why we create x.hat. The rest, we do not want in the model.

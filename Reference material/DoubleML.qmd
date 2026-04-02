@@ -1,0 +1,353 @@
+---
+title: "DoubleML"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+# Introduction
+
+In this document, we will apply Double Machine Learning. The data and case as well as parts of the documentation have been taken from https://docs.doubleml.org/tutorial/stable/notebooks/Uplift_example_tools.html and then extended and converted to R by myself.
+
+The data is simulated (artificial) data for which we know the true effects. The data generating process is calibrated based on empirical examples and common simulations in research. The goal is to mimic an observational dataset, which is derived from from a marketing campaign with the goal of increasing the conversion rate of a product.
+
+# Scenario
+
+We consider a scenario with an online shop that wants to evaluate the effect of their email campaigns. They send regular emails to their newsletter subscribers, in which they offer a discount for a specific product. The goal is to increase the conversion rate of the product. So far, they always sent the same email to all subscribers, i.e., every subscriber receives a coupon. Now, they want to investigate if a new strategy could be more effective, i.e., by targeting the coupons towards specific subgroups of their subscribers. The rationale behind this is that some subscribers would have bought the product anyway, even without the discount. Hence, they evaluate their historical (non-experimental) sales data over the last months.
+
+```{r}
+#| echo: false
+#| warning: false
+library(tidyverse)
+library(sjPlot)
+
+library(DoubleML)
+library(mlr3)
+library(mlr3learners)
+
+```
+
+## Data
+
+Load our dataset and examine all available features.
+
+```{r}
+url = 'https://docs.doubleml.org/tutorial/stable/datasets/data/uplift_data.csv' 
+df = read_csv(url, show_col_types = FALSE)
+
+control.vars <- c('membership_level_1', 'membership_level_2',
+                   'X0', 'X1', 'X2', 'X3', 'X4', 'X5',
+                   'X6', 'X7', 'X8', 'X9', 'X10',
+                   'X11', 'X12', 'X13', 'X14')
+```
+
+The dataset contains 10,000 observations and 22 variables. The variables are
+
+-   `conversion`: the outcome of interest (binary)
+-   `coupon`: the treatment variable, whether the customer used a coupon (binary)
+-   `X1`-`X14`: A set of continuous features (numeric), measuring information on age, previous activities, time of last purchase, etc.
+-   `membership_level`: Dummy coded categorical feature for information on membership level (binary)
+-   `Z`: A score measuring customers’ activity 2 months after the campaign (numeric)
+-   `ite`: The individual treatment effect (numeric)
+
+All continuous variables have been normalized in this dataset to ease estimation with different ML models.
+
+Of course, in a real-world application, we would not have the individual effect `ite` available. We will use it here to evaluate the performance of our model.
+
+## Problem Formulation
+
+The goal is to estimate the effect of the treatment variable `coupon` on the the `conversion` probability. Note that in this setting, both treatment and outcome are binary variables.
+
+As the dataset is observational, we will have to decide which variables are confounders and what we have to control for. Usually it is very helpful to visualize the problem in a causal graph or directed acyclic graph (DAG). 
+
+One aspect that you should note is that Z is a potential collider that should not be included in the analysis. As it represents customer activity 2 months after the campaign it may be affected by the outcome (`conversion`) and the treatment (`coupon`).
+
+# The true ATE
+
+As a first impression, let’s calculate the true ATE (based on the `ite` that we only have because it is simulated data).
+
+```{r}
+ATE <- mean(df$ite)
+round(ATE, 3)
+```
+
+# Naive regression
+
+Now, let's calculate the estimate from a simple regression of `coupon` on `conversion`.
+
+As we have discussed in the course, this regression would only be meaningful if `coupon` is independent of potential outcomes (unconfounded, randomized). We know that this is not the case here, because only specific customer groups are chosen based on their characteristics that also likely lead to conversion.
+
+```{r}
+
+# Run simple linear OLS regression to get mean differences in conversion probability 
+lm.fit <- lm(conversion~coupon, data=df)
+tab_model(lm.fit, digits = 3)
+
+```
+
+We estimate a negative effect on conversion rate (of around 2%) while the true effect is a positive effect of about 4%.
+
+# Regression with covariates
+
+Next, let's fit a linear regression model where we include all available covariates.
+
+*Note: We do not include Z because Z is a collider.*
+
+This simple regression adjustment model should work well if we have all confounders (which is given in this example) and if they are all linearly related to the outcome (which is not necessarily given in this case).
+
+```{r}
+lm.fit.full <- lm(conversion~coupon+membership_level_1+membership_level_2+X0+X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14, data=df)
+tab_model(lm.fit.full, digits = 3)
+
+```
+
+The estimate turns positive, but is not significant. Overall, we might conclude that the coupon is not really effective, which would be wrong in this case.
+
+# AIPW
+
+Next, we will implement the AIPW with logistic regression for the treatment model (propensity score) and linear regression for the outcome model.
+
+```{r}
+# Standard linear regression for the outcome
+lm.mu <- lm(conversion~coupon+membership_level_1+membership_level_2+X0+X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14, data=df)
+
+mu1 <- predict(lm.mu, newdata = transform(df, coupon = 1))
+mu0 <- predict(lm.mu, newdata = transform(df, coupon = 0))
+
+# Logistic regression model for the propensity score
+model_prop <- glm(coupon ~ membership_level_1+membership_level_2+X0+X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14, data=df, family = binomial())
+ps <- predict(model_prop, type = "response")
+
+ATE.aipw <- mean(mu1 + (df$coupon/ps)*(df$conversion-mu1)) - mean(mu0 + ((1-df$coupon)/(1-ps))*(df$conversion-mu0)) 
+ATE.aipw
+
+```
+
+Here, the effect is even worse than the simple linear regression model with all covariates, because neither the linear regression outcome model nor the logistic regression propensity score model are correct in this case.
+
+# Double ML - simpl model/learners
+
+Next, we will use the double ML model but also with a simple linear outcome and logistic propensity score model. The results should be very similar to the AIPW.
+
+```{r}
+# The outcome model (residualize Y)
+# Note: You do not include the treatment variable coupon 
+lm.y <- lm(conversion~membership_level_1+membership_level_2+X0+X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14, data=df)
+
+Y_tilde <- df$conversion - predict(lm.y)
+
+# The The treatment or selection model (or propensity score model)
+# Note: Contrary to AIPW we are not getting the predicted values for T but the residuals which is T - ps
+# I will reuse my previous estimation of ps from the AIPW calculation
+T_tilde <- df$coupon - ps
+
+#tab_model(lm(Y_tilde ~ 0+T_tilde), digits = 3)  
+
+summary(lm(Y_tilde ~ 0+T_tilde))
+
+```
+
+And the expectation is confirmed. The double ML with linear regression outcome model and propensity score selection model is more or less the same as the AIPW.
+
+---
+
+Now, we will also use the `DoubleML` package in R that has pre-made function for the whole process.
+
+There are two main decision for the package usage:
+
+1)  Which model to use (partial regression model, interactive regression model, or IV models)
+
+2)  Which learners to use for the outcome and selection model
+
+For now, we are focusing on the partial regression model, which is what we use to estimate an ATE and replicates the process that we did manually before with the simple linear and logistic regression model.
+
+```{r}
+
+# Construct DoubleMLData object from data
+dml_data_df = double_ml_data_from_data_frame(data.frame(df),
+                                            y_col='conversion',
+                                            d_cols='coupon',
+                                            x_cols=control.vars)
+
+# Defining the learners - here simple linear and logistic regression
+ml_g_lm = lrn("regr.lm")
+ml_m_glm = lrn("classif.log_reg", predict_type = "prob")
+
+# Uses a partial linear regression model
+# Note: For comparability, we first use the double ML without cross-fitting to show equivalence to the previous approach. Afterwards we will also do cross-fitting.
+dml_plr_simple = DoubleMLPLR$new(dml_data_df, ml_l = ml_g_lm, ml_m = ml_m_glm, n_folds = 1, apply_cross_fitting = FALSE)
+
+# Estimation & summary
+dml_plr_simple$fit()
+dml_plr_simple$summary()
+```
+
+The result is the same. The advantage of using the package is that it provides ways of doing cross-fitting and integrating more flexible ML learners. Let's start by adding cross-fitting.
+
+```{r}
+set.seed(31574)
+# Now with cross-fitting.
+dml_plr_simple2 = DoubleMLPLR$new(dml_data_df, ml_l = ml_g_lm, ml_m = ml_m_glm, n_folds = 5)
+
+# Estimation & summary
+dml_plr_simple2$fit(store_predictions = TRUE)
+dml_plr_simple2$summary()
+```
+
+The difference is not very large because linear regression and logistic regression do not tend to overfit to much, compared to other more flexible ML. Thus, overfitting bias is less of a problem when using these simple methods.
+
+# Double ML (more flexible learners)
+
+We will now use more flexible learners (i.e., xgboost) for both the selection and the outcome model.
+
+```{r}
+set.seed(314)
+# Xgboost learners
+ml_g_xgb = lrn("regr.xgboost", objective = "reg:squarederror",  eta = 0.1, nrounds = 35)
+ml_m_xgb = lrn("classif.xgboost", objective = "binary:logistic", eval_metric = "logloss", eta = 0.1, nrounds = 34, predict_type = "prob")
+
+# Uses a partial linear regression model
+dml_plr_xgboost = DoubleMLPLR$new(dml_data_df, ml_l = ml_g_xgb, ml_m = ml_m_xgb, n_folds = 5)
+
+# Estimation
+dml_plr_xgboost$fit()
+#
+dml_plr_xgboost$summary()
+```
+
+The estimated ATE is much closer to the true ATE than with regression adjustment. We get a positive effect of around 3 percentage points increase in conversions and is highly significant.
+
+# DoubleML (self-made)
+
+Here, I replicate the process of double ML with flexible learners without the use of the `DoubleML` package.
+
+However, I will also built on using the `mlr3learners` package to make things comparable.
+
+This example here builds on the partial linear model with xgboost learners.
+
+```{r}
+
+# Setup the resampling process so that it will be the same for both models
+
+set.seed(314)
+# set up a task and cross-validation resampling scheme in mlr3
+dummy_task = Task$new("help task", "regr", df)
+sampling = rsmp("cv", folds = 5)$instantiate(dummy_task)
+
+train_ids = lapply(1:5, function(x) sampling$train_set(x))
+test_ids = lapply(1:5, function(x) sampling$test_set(x))
+smpls = list(train_ids = train_ids, test_ids = test_ids)
+
+
+###################################################
+# The outcome model - learning g
+
+# Create a task and specify the DV
+task_y <- as_task_regr(df, target = "conversion")
+task_y$select(control.vars)
+
+# Set up cross-validation
+#resampling_y <- rsmp("cv", folds = 5)
+resampling_y <- rsmp("custom")$instantiate(task_y, smpls$train_ids, smpls$test_ids)
+
+# Execute cross-validation
+g_model <- resample(task = task_y, learner = ml_g_xgb, resampling = resampling_y)
+
+# Show some performance metrics of the ML model
+g_model$score(msr("regr.mse"))
+g_model$aggregate(msr("regr.mse"))
+
+# Access the cross-fitted predictions
+g_model_predictions <- g_model$prediction()
+g_model_pred_data <- data.frame(
+    row_id = g_model_predictions$row_ids,
+    response = g_model_predictions$response)
+
+# Extract orthogonalized score for outcome model (residual)  
+# Important: Needs to be sorted to match the original data
+Y_tilde <- df$conversion - g_model_pred_data[order(g_model_pred_data$row_id),"response"]
+
+###################################################
+# The treatment or selection model - learning m
+
+# Create a task and specify the DV
+task_w <- as_task_classif(df, target = "coupon", positive = "1")
+task_w$select(control.vars)
+
+# Set up cross-validation
+#resampling <- rsmp("cv", folds = 5)
+resampling_w <- rsmp("custom")$instantiate(task_w, smpls$train_ids, smpls$test_ids)
+
+set.seed(3141)
+# Execute cross-validation
+m_model <- resample(task = task_w, learner = ml_m_xgb, resampling = resampling_w)
+
+# Show some performance metrics of the ML model
+m_model$aggregate(list(
+  msr("classif.ce"),
+  msr("classif.auc"),
+  msr("classif.logloss")
+))
+
+# Access the cross-fitted predictions
+m_model_predictions <- m_model$prediction()
+m_model_pred_data <- data.frame(
+    row_id = m_model_predictions$row_ids,
+    prob1 = m_model_predictions$prob[,1])
+  
+# Extract orthogonalized score for selection model (residual)
+# Important: Needs to be sorted to match the original data
+T_tilde <- df$coupon - m_model_pred_data[order(m_model_pred_data$row_id),"prob1"]
+    
+# We could now run the partial regression on the orthogonalized scores to estimate the ATE
+summary(lm(Y_tilde ~ 0+T_tilde))     
+# Note: The SE is not quite correct but very similar
+  
+# Or we calculate the ATE as
+ate <- mean(Y_tilde*T_tilde)/mean(T_tilde^2)
+ate
+
+```
+
+**Note 1:** There are two ways to implement the aggregation over the cross-fitted residuals:
+
+-   You can calculate the ATE per cross-fitted fold (e.g., five different ATEs) and then averages over the ATEs.
+
+-   You can stack all cross-fitted residuals into one vector and then calculates ATEs for all residuals together.
+
+Here, I have implemented approach 2, because it is easier to implement and it is also the default for the `DoubleML` package. Thus, we will get the same estimate.
+
+
+# Including the collider
+
+Finally, I will illustrate what happens if we include the collider into the set of covariates. This can happen, for example, if the researcher does not carefully select the covariates for inclusion, but uses all available variables.
+
+```{r}
+
+# Construct DoubleMLData object from data
+dml_data_df2 = double_ml_data_from_data_frame(data.frame(df),
+                                            y_col='conversion',
+                                            d_cols='coupon',
+                                            x_cols=c(control.vars,"Z"))
+
+set.seed(314)
+# Uses a partial linear regression model
+dml_plr_xgboost = DoubleMLPLR$new(dml_data_df2, ml_l = ml_g_xgb, ml_m = ml_m_xgb, n_folds = 5)
+
+# Estimation
+dml_plr_xgboost$fit()
+#
+dml_plr_xgboost$summary()
+```
+
+We can see that in this case we heavily underestimate the true ATE. Thus, a single bad control can ruin everything..
+
+# References
+
+Bach, P., Chernozhukov, V., Kurz, M. S., and Spindler, M. (2022), DoubleML - An Object-Oriented Implementation of Double Machine Learning in Python, Journal of Machine Learning Research, 23(53): 1-6, https://www.jmlr.org/papers/v23/21-0862.html.
+
+Bach, P., Chernozhukov, V., Kurz, M. S., Spindler, M. and Klaassen, S. (2024), DoubleML - An Object-Oriented Implementation of Double Machine Learning in R, Journal of Statistical Software, 108(3): 1-56, doi:10.18637/jss.v108.i03, arXiv:2103.09603.

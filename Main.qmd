@@ -1,0 +1,634 @@
+---
+title: "L.V. Causality Marketing Assignment 2"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+library(ggplot2)
+library(AER)
+library(MatchIt)
+library(sandwich)
+library(lmtest)
+library(DoubleML)
+library(mlr3)
+library(mlr3learners)
+library(glmnet)
+library(ranger)
+library(xgboost)
+```
+
+# Import Data
+```{r}
+casedata_task3 <- read.csv("CaseData_Task3.csv", stringsAsFactors = FALSE)
+
+# Display the structure of the data to verify column names
+str(casedata_task3)
+
+# Check the first few rows
+head(casedata_task3)
+```
+<!-- # Use only treatment + appropriate pre-treatment covariates -->
+
+# Estimate the treatment effect using simple linear Regression Adjustment
+The estimate for the discount coefficient is the Regression Adjustment ATE
+```{r}
+model_adj <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+                 X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+                 data = casedata_task3)
+
+summary(model_adj)
+```
+
+## Specifically extract the ATE value
+```{r}
+ate <- coef(model_adj)["d"]
+cat("The estimated Average Treatment Effect (ATE) for the treatment is:", ate, "\n")
+```
+
+```{r}
+# Optional: robust SE
+coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
+```
+
+# Matching comparisons
+Preparing the data for matching excersises
+```{r}
+ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
+```
+
+## 1:1 Nearest Neighbor Matching WITHOUT Replacement
+```{r}
+cat("\n--- Matching: 1:1 Without Replacement ---\n")
+match_no_replace <- matchit(ps_formula, 
+                            data = casedata_task3, 
+                            method = "nearest", 
+                            distance = "glm",   # Uses logistic regression for propensity scores
+                            replace = FALSE,    # Without replacement
+                            ratio = 1)          # 1:1 matching
+
+# View a summary to check covariate balance (ideally Std. Mean Diff < 0.1)
+cat("Balance Summary (Without Replacement):\n")
+print(summary(match_no_replace, un = FALSE))
+
+# Extract the matched dataset
+data_matched_no_replace <- match.data(match_no_replace)
+
+# Estimate the Treatment Effect
+# We include the covariates in the final outcome model to make it "doubly robust"
+model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+                       data = data_matched_no_replace, 
+                       weights = weights)
+
+# Calculate robust standard errors
+cat("\nTreatment Effect (Without Replacement):\n")
+print(coeftest(model_no_replace, vcov. = vcovHC))
+```
+
+```{r}
+att <- coef(model_no_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+## 1:1 Nearest Neighbor Matching WITH Replacement
+```{r}
+cat("\n--- Matching: 1:1 With Replacement ---\n")
+match_with_replace <- matchit(ps_formula, 
+                              data = casedata_task3, 
+                              method = "nearest", 
+                              distance = "glm",
+                              replace = TRUE,     # With replacement
+                              ratio = 1)
+
+# View a summary to check covariate balance
+cat("Balance Summary (With Replacement):\n")
+print(summary(match_with_replace, un = FALSE))
+
+# Extract the matched dataset
+# Use get_matches() instead of match.data() when matching WITH replacement 
+# to properly duplicate rows that are used as matches multiple times.
+data_matched_with_replace <- get_matches(match_with_replace)
+
+# Estimate the Treatment Effect
+model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+                         data = data_matched_with_replace, 
+                         weights = weights)
+
+# For matching WITH replacement, individuals can be matched multiple times. 
+# Therefore, standard errors must be clustered by the matched pair ID (`subclass`).
+cat("\nTreatment Effect (With Replacement):\n")
+print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
+```
+
+```{r}
+att <- coef(model_with_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+
+
+
+## Euclidean Distance Matching
+```{r}
+euc_out <- matchit(
+  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+       X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+  data = casedata_task3,
+  method = "nearest",
+  distance = "euclidean",
+  normalize = TRUE
+)
+
+summary(euc_out)
+# bal.tab(euc_out) - balance info already shown in summary above
+
+m_data_euc <- match.data(euc_out)
+lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+             data = m_data_euc, weights = weights)
+
+cat("\nTreatment Effect (Euclidean Matching):\n")
+summary(lm_euc)
+
+cat("\nRobust Standard Errors (Euclidean Matching):\n")
+print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
+```
+
+
+## Inverse Probability Weighting (IPW)
+```{r}
+# Complete-case sample for IPW variables
+ipw_vars <- c("y", "d", paste0("X", 1:20))
+df_ipw <- casedata_task3[complete.cases(casedata_task3[, ipw_vars]), ]
+
+# 1) Estimate propensity scores with logistic regression
+ps_model <- glm(
+  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+      X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+  data = df_ipw,
+  family = binomial(link = "logit")
+)
+
+df_ipw$ps <- predict(ps_model, type = "response")
+
+# Overlap/common support diagnostic BEFORE trimming
+ggplot(df_ipw, aes(x = ps, color = factor(d), fill = factor(d))) +
+  geom_density(alpha = 0.25) +
+  labs(
+    title = "Propensity Score Overlap (Before Trimming)",
+    x = "Estimated propensity score",
+    y = "Density",
+    color = "Treatment (d)",
+    fill = "Treatment (d)"
+  ) +
+  theme_minimal()
+
+# 2) Trim propensity scores to reduce extreme weights under weak overlap
+df_ipw$ps_trim <- pmin(pmax(df_ipw$ps, 0.01), 0.99)
+
+# Function requested in prompt: two-step IPW ATE with logistic PS + trimming
+estimate_ipw_ate <- function(data, trim = 0.01) {
+  ps_fit <- glm(
+    d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+      X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+    data = data,
+    family = binomial(link = "logit")
+  )
+
+  ps_hat <- predict(ps_fit, newdata = data, type = "response")
+  ps_hat <- pmin(pmax(ps_hat, trim), 1 - trim)
+
+  mean(data$y * (data$d / ps_hat - (1 - data$d) / (1 - ps_hat)))
+}
+
+# 3) Manual IPW ATE using slide formula:
+#    ATE = mean( y * ( d/ps - (1-d)/(1-ps) ) )
+ate_ipw_manual <- estimate_ipw_ate(df_ipw, trim = 0.01)
+
+cat("\nManual IPW ATE (primary estimate):", round(ate_ipw_manual, 4), "\n")
+
+# 4) Bootstrap inference for the full two-step IPW estimator:
+#    re-sample rows, re-estimate propensity model, re-calculate ATE each draw.
+set.seed(123)
+B_ipw <- 1000
+n_ipw <- nrow(df_ipw)
+boot_ipw_ate <- numeric(B_ipw)
+
+for (b in seq_len(B_ipw)) {
+  idx <- sample.int(n_ipw, size = n_ipw, replace = TRUE)
+  boot_data <- df_ipw[idx, ]
+  boot_ipw_ate[b] <- estimate_ipw_ate(boot_data, trim = 0.01)
+}
+
+ipw_boot_mean <- mean(boot_ipw_ate)
+ipw_boot_se <- sd(boot_ipw_ate)
+ipw_boot_ci <- quantile(boot_ipw_ate, probs = c(0.025, 0.975))
+
+cat("Bootstrap mean (IPW):", round(ipw_boot_mean, 4), "\n")
+cat("Bootstrap SE (IPW):", round(ipw_boot_se, 4), "\n")
+cat("95% percentile CI (IPW): [", round(ipw_boot_ci[1], 4), ",", round(ipw_boot_ci[2], 4), "]\n")
+
+# 5) Secondary comparison: IPW weighted regression-adjustment model
+df_ipw$ipw_weight <- ifelse(df_ipw$d == 1,
+                            1 / df_ipw$ps_trim,
+                            1 / (1 - df_ipw$ps_trim))
+
+cat("\nInverse Probability Weights Summary:\n")
+summary(df_ipw$ipw_weight)
+
+lm_ipw <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+             data = df_ipw, weights = ipw_weight)
+
+cat("\nSecondary comparison: weighted lm IPW-RA model\n")
+print(summary(lm_ipw))
+print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3")))
+```
+
+### IPW Critical Discussion Points
+- Overlap/common support: if many propensity scores are near 0 or 1, inverse weights become extreme and the estimator becomes unstable with high variance.
+- Weighting logic: IPW up-weights observations with treatment status that is unlikely given their covariates, creating a pseudo-population with improved covariate balance.
+- Efficiency: IPW is unbiased under conditional independence and overlap, but often has higher variance than AIPW.
+
+## Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
+This section implements AIPW manually using the doubly robust score:
+
+$$
+ATE = \frac{1}{N}\sum_{i=1}^{N} \left( \frac{T_i}{\hat{p}(X_i)}(Y_i - \hat{\mu}_{T=1}(X_i)) + \hat{\mu}_{T=1}(X_i) \right)
+- \frac{1}{N}\sum_{i=1}^{N} \left( \frac{(1-T_i)}{1-\hat{p}(X_i)}(Y_i - \hat{\mu}_{T=0}(X_i)) + \hat{\mu}_{T=0}(X_i) \right)
+$$
+
+```{r}
+# User-requested structure:
+# df            : data frame
+# treatment     : binary treatment indicator (0/1)
+# sales         : numeric outcome
+# covariates    : character vector with covariate names
+
+df <- casedata_task3
+df$treatment <- df$d
+df$sales <- df$y
+covariates <- paste0("X", 1:20)
+
+# Basic checks
+stopifnot(all(c("treatment", "sales") %in% names(df)))
+stopifnot(all(covariates %in% names(df)))
+stopifnot(all(na.omit(unique(df$treatment)) %in% c(0, 1)))
+
+# Keep complete cases for variables used in AIPW
+aipw_vars <- c("treatment", "sales", covariates)
+df_aipw <- df[complete.cases(df[, aipw_vars]), aipw_vars]
+
+# AIPW function returning the sample ATE using the manual formula
+estimate_aipw_ate <- function(data, covariate_names, trim = 0.01) {
+  # 1) Selection model (propensity score): P(T=1|X)
+  ps_formula <- as.formula(
+    paste("treatment ~", paste(covariate_names, collapse = " + "))
+  )
+  ps_model <- glm(ps_formula, data = data, family = binomial(link = "logit"))
+  p_hat <- predict(ps_model, newdata = data, type = "response")
+
+  # Trimming avoids extreme inverse-probability weights when overlap is weak
+  p_hat <- pmin(pmax(p_hat, trim), 1 - trim)
+
+  # 2) Outcome models fitted separately by treatment arm
+  mu1_formula <- as.formula(
+    paste("sales ~", paste(covariate_names, collapse = " + "))
+  )
+  mu0_formula <- mu1_formula
+
+  outcome_model_treated <- lm(mu1_formula, data = data[data$treatment == 1, ])
+  outcome_model_control <- lm(mu0_formula, data = data[data$treatment == 0, ])
+
+  # Predicted potential outcomes for every unit
+  mu1_hat <- predict(outcome_model_treated, newdata = data)
+  mu0_hat <- predict(outcome_model_control, newdata = data)
+
+  # 3) Doubly robust correction terms:
+  #    residuals (Y - mu_hat) are reweighted by inverse propensity scores.
+  #    If either the PS model or the outcome models are correctly specified,
+  #    the estimator remains consistent.
+  score_treated <- (data$treatment / p_hat) * (data$sales - mu1_hat) + mu1_hat
+  score_control <- ((1 - data$treatment) / (1 - p_hat)) * (data$sales - mu0_hat) + mu0_hat
+
+  mean(score_treated) - mean(score_control)
+}
+
+# Point estimate
+aipw_ate <- estimate_aipw_ate(df_aipw, covariates, trim = 0.01)
+cat("Manual AIPW ATE estimate:", round(aipw_ate, 4), "\n")
+
+# 4) Bootstrap inference for AIPW
+set.seed(123)
+B <- 1000
+n <- nrow(df_aipw)
+boot_ate <- numeric(B)
+
+for (b in seq_len(B)) {
+  idx <- sample.int(n, size = n, replace = TRUE)
+  boot_data <- df_aipw[idx, ]
+  boot_ate[b] <- estimate_aipw_ate(boot_data, covariates, trim = 0.01)
+}
+
+aipw_se <- sd(boot_ate)
+aipw_ci <- quantile(boot_ate, probs = c(0.025, 0.975))
+aipw_boot_mean <- mean(boot_ate)
+
+cat("Bootstrap mean (AIPW):", round(aipw_boot_mean, 4), "\n")
+cat("Bootstrap SE (AIPW):", round(aipw_se, 4), "\n")
+cat("95% Bootstrap CI (AIPW): [", round(aipw_ci[1], 4), ",", round(aipw_ci[2], 4), "]\n")
+```
+
+### AIPW Critical Discussion Points
+- Doubly robust consistency: AIPW is consistent if either the propensity score model or the outcome regression models are correctly specified.
+- Efficiency: Compared with simple IPW, AIPW is typically more stable and can achieve the semiparametric efficiency bound under correct specification.
+- Debiasing logic: The residual-weighted terms, $(Y - \hat{\mu})$, correct the regression predictions using inverse-probability weighting.
+- Overlap/common support: Propensity scores should stay away from 0 and 1; weak overlap creates extreme weights and unstable estimates, so diagnostics and trimming are important.
+
+# Double Machine Learning (DML): PLR with Cross-Fitting
+We now estimate the ATE with DoubleML using the partially linear regression model:
+
+$$
+Y = \beta D + g(X) + \epsilon, \qquad D = m(X) + \xi
+$$
+
+Cross-fitting (sample splitting) is used to reduce overfitting bias in nuisance estimation, and the orthogonal score makes the final $\beta$ less sensitive to small nuisance-model errors.
+
+```{r}
+# Data setup for DML
+x_cols <- paste0("X", 1:20)
+dml_vars <- c("y", "d", x_cols)
+dml_df <- casedata_task3[complete.cases(casedata_task3[, dml_vars]), dml_vars]
+
+# Binary treatment check
+stopifnot(all(unique(dml_df$d) %in% c(0, 1)))
+
+# DoubleML data backend
+dml_data <- DoubleMLData$new(
+  data = dml_df,
+  y_col = "y",
+  d_cols = "d",
+  x_cols = x_cols
+)
+
+# Tasks for out-of-sample nuisance performance
+# Use only X covariates as predictors to match DML nuisance definitions.
+task_y_data <- dml_df[, c("y", x_cols)]
+task_y <- TaskRegr$new(id = "outcome_task", backend = task_y_data, target = "y")
+
+task_d_data <- dml_df[, x_cols]
+task_d_data$d_factor <- factor(dml_df$d, levels = c(0, 1))
+task_d <- TaskClassif$new(
+  id = "treatment_task",
+  backend = task_d_data,
+  target = "d_factor",
+  positive = "1"
+)
+
+# Helper to construct requested learners with a fallback if IDs differ by install
+get_lrn <- function(primary_id, fallback_id = NULL, ...) {
+  if (primary_id %in% mlr_learners$keys()) {
+    return(lrn(primary_id, ...))
+  }
+  if (!is.null(fallback_id) && fallback_id %in% mlr_learners$keys()) {
+    message("Learner ", primary_id, " not found; using fallback ", fallback_id)
+    return(lrn(fallback_id, ...))
+  }
+  stop("Required learner not found: ", primary_id,
+       if (!is.null(fallback_id)) paste0(" (fallback also missing: ", fallback_id, ")") else "")
+}
+
+# Run one DML specification: nuisance metrics + PLR estimate
+run_dml_spec <- function(spec_name, regr_id, classif_id,
+                         regr_fallback = NULL, classif_fallback = NULL) {
+  set.seed(123)
+
+  # Outcome nuisance model g(X): evaluate out-of-sample RMSE
+  learner_y <- get_lrn(regr_id, regr_fallback)
+  rr_y <- resample(task_y, learner_y$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  rmse_y <- rr_y$aggregate(msr("regr.rmse"))
+
+  # Selection nuisance model m(X): evaluate out-of-sample log-loss and error
+  learner_d_class <- get_lrn(classif_id, classif_fallback, predict_type = "prob")
+  rr_d <- resample(task_d, learner_d_class$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  logloss_d <- rr_d$aggregate(msr("classif.logloss"))
+  ce_d <- rr_d$aggregate(msr("classif.ce"))
+
+  # PLR in DoubleML uses regression nuisance learners for both l(X) and m(X)
+  # (classification learner above is used for requested selection-model diagnostics).
+  learner_m_regr <- get_lrn(regr_id, regr_fallback)
+  dml_plr <- DoubleMLPLR$new(
+    data = dml_data,
+    ml_l = learner_y$clone(),
+    ml_m = learner_m_regr$clone(),
+    n_folds = 5
+  )
+  dml_plr$fit()
+
+  data.frame(
+    Model = spec_name,
+    ATE_Beta = as.numeric(dml_plr$coef),
+    Std_Error = as.numeric(dml_plr$se),
+    RMSE_Y = as.numeric(rmse_y),
+    LogLoss_D = as.numeric(logloss_d),
+    Classif_Error_D = as.numeric(ce_d),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Three requested learner families
+dml_lasso <- run_dml_spec(
+  spec_name = "Lasso",
+  regr_id = "regr.lasso",
+  classif_id = "classif.lasso",
+  regr_fallback = "regr.cv_glmnet",
+  classif_fallback = "classif.cv_glmnet"
+)
+
+dml_rf <- run_dml_spec(
+  spec_name = "Random Forest",
+  regr_id = "regr.ranger",
+  classif_id = "classif.ranger"
+)
+
+dml_xgb <- run_dml_spec(
+  spec_name = "XGBoost",
+  regr_id = "regr.xgboost",
+  classif_id = "classif.xgboost"
+)
+
+dml_results <- rbind(dml_lasso, dml_rf, dml_xgb)
+dml_results$CI_Lower_95 <- dml_results$ATE_Beta - 1.96 * dml_results$Std_Error
+dml_results$CI_Upper_95 <- dml_results$ATE_Beta + 1.96 * dml_results$Std_Error
+
+cat("\n=== DML (PLR) Comparison Across Learners ===\n\n")
+dml_results_to_print <- dml_results
+num_cols <- sapply(dml_results_to_print, is.numeric)
+dml_results_to_print[num_cols] <- lapply(dml_results_to_print[num_cols], round, 4)
+print(dml_results_to_print, row.names = FALSE)
+
+# "Well-fitting" model selection rule:
+# prioritize low out-of-sample nuisance errors (RMSE_Y and LogLoss_D),
+# because DML relies on high-quality nuisance prediction rather than interpretability.
+scale01 <- function(x) {
+  rng <- range(x)
+  if (diff(rng) == 0) return(rep(0, length(x)))
+  (x - rng[1]) / diff(rng)
+}
+
+dml_results$fit_score <- scale01(dml_results$RMSE_Y) + scale01(dml_results$LogLoss_D)
+best_idx <- which.min(dml_results$fit_score)
+
+cat("\nBest-fitting nuisance combination (lower RMSE + LogLoss):",
+    dml_results$Model[best_idx], "\n")
+```
+
+### DML Discussion Points
+- DML solves regularization bias and overfitting bias: sample splitting and cross-fitting reduce overfitting from flexible learners.
+- Predictive performance of nuisance models is central: lower RMSE/log-loss means cleaner residualization (orthogonalization) for treatment-effect estimation.
+- Compared with weighting estimators, PLR-style partialling out avoids direct division by propensity scores, which can be more stable under weak overlap.
+- Even with ML-based nuisance models, causal validity still depends on conditional independence and excluding bad controls (e.g., colliders).
+
+
+# Comparison of Treatment Effects Across Methods
+
+```{r}
+# Extract treatment effects and standard errors from all methods
+ate_regression <- coef(model_adj)["d"]
+se_regression <- sqrt(diag(vcovHC(model_adj, type = "HC3")))["d"]
+
+att_no_replace <- coef(model_no_replace)["d"]
+se_no_replace <- sqrt(diag(vcovHC(model_no_replace, type = "HC3")))["d"]
+
+att_with_replace <- coef(model_with_replace)["d"]
+se_with_replace <- sqrt(diag(vcovCL(model_with_replace, cluster = ~subclass)))["d"]
+
+ate_euc <- coef(lm_euc)["d"]
+se_euc <- sqrt(diag(vcovHC(lm_euc, type = "HC3")))["d"]
+
+ate_ipw <- ate_ipw_manual
+se_ipw <- ipw_boot_se
+
+ate_ipw_lm <- coef(lm_ipw)["d"]
+se_ipw_lm <- sqrt(diag(vcovHC(lm_ipw, type = "HC3")))["d"]
+
+ate_aipw <- aipw_ate
+se_aipw <- aipw_se
+
+# Calculate 95% confidence intervals
+ci_lower_reg <- ate_regression - 1.96 * se_regression
+ci_upper_reg <- ate_regression + 1.96 * se_regression
+
+ci_lower_no_rep <- att_no_replace - 1.96 * se_no_replace
+ci_upper_no_rep <- att_no_replace + 1.96 * se_no_replace
+
+ci_lower_rep <- att_with_replace - 1.96 * se_with_replace
+ci_upper_rep <- att_with_replace + 1.96 * se_with_replace
+
+ci_lower_euc <- ate_euc - 1.96 * se_euc
+ci_upper_euc <- ate_euc + 1.96 * se_euc
+
+ci_lower_ipw <- ipw_boot_ci[1]
+ci_upper_ipw <- ipw_boot_ci[2]
+
+ci_lower_ipw_lm <- ate_ipw_lm - 1.96 * se_ipw_lm
+ci_upper_ipw_lm <- ate_ipw_lm + 1.96 * se_ipw_lm
+
+ci_lower_aipw <- aipw_ci[1]
+ci_upper_aipw <- aipw_ci[2]
+
+# Create base comparison table for classical/weighting estimators
+comparison_table_base <- data.frame(
+  Method = c(
+    "Regression Adjustment",
+    "Matching (1:1 No Replacement)",
+    "Matching (1:1 With Replacement)",
+    "Euclidean Distance Matching",
+    "Inverse Probability Weighting (IPW) - Manual Formula",
+    "IPW Weighted Regression (Secondary)",
+    "Augmented IPW (AIPW) - Manual Formula"
+  ),
+  Estimand = c(
+    "ATE",
+    "ATT",
+    "ATT",
+    "ATT",
+    "ATE",
+    "ATE",
+    "ATE"
+  ),
+  Inference = c(
+    "HC3",
+    "HC3",
+    "Clustered (subclass)",
+    "HC3",
+    "Bootstrap (1000)",
+    "HC3",
+    "Bootstrap (1000)"
+  ),
+  Estimate = c(
+    round(ate_regression, 4),
+    round(att_no_replace, 4),
+    round(att_with_replace, 4),
+    round(ate_euc, 4),
+    round(ate_ipw, 4),
+    round(ate_ipw_lm, 4),
+    round(ate_aipw, 4)
+  ),
+  Std_Error = c(
+    round(se_regression, 4),
+    round(se_no_replace, 4),
+    round(se_with_replace, 4),
+    round(se_euc, 4),
+    round(se_ipw, 4),
+    round(se_ipw_lm, 4),
+    round(se_aipw, 4)
+  ),
+  CI_Lower = c(
+    round(ci_lower_reg, 4),
+    round(ci_lower_no_rep, 4),
+    round(ci_lower_rep, 4),
+    round(ci_lower_euc, 4),
+    round(ci_lower_ipw, 4),
+    round(ci_lower_ipw_lm, 4),
+    round(ci_lower_aipw, 4)
+  ),
+  CI_Upper = c(
+    round(ci_upper_reg, 4),
+    round(ci_upper_no_rep, 4),
+    round(ci_upper_rep, 4),
+    round(ci_upper_euc, 4),
+    round(ci_upper_ipw, 4),
+    round(ci_upper_ipw_lm, 4),
+    round(ci_upper_aipw, 4)
+  ),
+  row.names = NULL
+)
+
+# Add DML learner-specific estimates to the same comparison table
+dml_comparison <- data.frame(
+  Method = paste0("DML-PLR (", dml_results$Model, ")"),
+  Estimand = rep("ATE", nrow(dml_results)),
+  Inference = rep("Orthogonal score SE (cross-fit)", nrow(dml_results)),
+  Estimate = round(dml_results$ATE_Beta, 4),
+  Std_Error = round(dml_results$Std_Error, 4),
+  CI_Lower = round(dml_results$CI_Lower_95, 4),
+  CI_Upper = round(dml_results$CI_Upper_95, 4),
+  row.names = NULL
+)
+
+comparison_table <- rbind(comparison_table_base, dml_comparison)
+
+cat("\n=== Summary: Treatment Effects Across All Methods (with 95% CIs) ===\n\n")
+print(comparison_table, row.names = FALSE)
+
+cat("\nNote: ATT rows are matching estimands; all other rows report ATE.\n")
+cat("DML rows include learner-specific PLR estimates with 5-fold cross-fitting and orthogonal-score inference.\n")
+```

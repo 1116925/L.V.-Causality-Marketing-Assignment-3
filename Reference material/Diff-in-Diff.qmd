@@ -1,0 +1,207 @@
+---
+title: "Difference in difference"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r setup, include=FALSE}
+# Load necessary packages
+
+# Needed for the plots
+library(dplyr)
+library(ggplot2)
+library(sjPlot)
+library(plm)
+library(fixest)
+```
+
+# Introduction
+
+In this document, we will go through the analysis for the example data for the difference in difference approach.
+
+## Research Problem - a hypothetical example
+
+City of Oslo has for many years been discussing the best way to integrate more affordable and social housing throughout the city, without introducing ghettos of lower-income, less educated and poorer neighborhoods - which are creating integration issues in other cities like Paris or in some cities in Sweden. The solution the city government proposes is spreading new social housing projects around the city and surrounding areas.
+
+As a young real estate agent you are tasked by your employer to evaluate how new housing projects in the city may affect real-estate prices in different areas, and, in particular, how will real-estate prices be affected in areas that were previously not featuring many social housing project vs. in areas with previously many social housing. This is directly related to your firm's revenues as well as designing your selling strategies in different areas.
+
+-   You are able to observe real-estate prices over the last 20 years in 200 different neighborhoods in Oslo.
+
+-   You note the prices for neighborhoods that historically did not have many housing projects (Few_projects) and those that had relatively many housing projects (Many_projects).
+
+-   Prices variable is indicating a price per 100 square meters flat (in million NOK) at different locations.
+
+-   Assume that in the first 14 years of your observations the government of Oslo did not impose policies of spreading the housing neighborhoods around the city, but in the last 6 years that policy was in place.
+
+## Data Generating Process
+
+We generate a dataset of 200 neighborhoods over 20 time periods, for which we observe the outcome (i.e., prices). Some of these neighborhoods have historically many and other had few housing projects. Those that had few have initially higher prices (rich neighborhoods). You can also see this in the following visual inspection of the data.
+
+We are interested in estimating the (causal) effect of the treatment; i.e., the change in policy.
+
+Some characteristics of this DGP:
+
+-   Level difference between "many" and "few" of 3 (i.e., $\alpha_{g}$)
+-   Common time trend of 0.2 (i.e., $\delta_{t}$)
+-   Treatment effect of -1 (i.e., $\beta$)
+
+```{r dgp, echo=FALSE}
+# Set seed for reproducibility
+set.seed(16579)
+
+# Define the number of observations
+num_neighborhood <- 200
+num_time <- 20
+
+# Design matrix
+data1 <- expand.grid(
+  neighborhood = factor(1:num_neighborhood),
+  time = 1:num_time
+)
+
+# Common time trend
+data1$Trend_ef <- data1$time*0.2 + rnorm(num_time, 0, 1.5)
+
+# Brand fixed-effect
+data1$Nbh_ef <- runif(num_neighborhood, 1, 6)[as.numeric(data1$neighborhood)]
+
+# Pre post variable
+data1$policy <- ifelse(data1$time<15,0,1)
+
+# Generate treatment assignment for brands
+data1$projects <- sample(c("Few","Many"), size = num_neighborhood, replace = TRUE)[as.numeric(data1$neighborhood)]
+
+data1$projects_dum <- ifelse(data1$projects=="Few",1,0)
+
+data1$prices <- round(10 + data1$Trend_ef + data1$Nbh_ef + 3*data1$projects_dum - 1* data1$projects_dum*data1$policy + rnorm(num_neighborhood*num_time, 0, 2),2)
+
+data1 <- data1 %>% select(-c("Trend_ef", "Nbh_ef"))
+
+```
+
+## Visual inspection of the data
+
+```{r plot, echo=FALSE, message=FALSE}
+# Recode W as "treatment" and "control"
+data1 <- data1 %>%
+  mutate(projects = as.factor(ifelse(projects == "Few", "Treatment", "Control")))
+
+# Calculate the average values of Y for each group of W over time
+averages2 <- data1 %>%
+  group_by(projects, time) %>%
+  summarize(mean_prices = mean(prices))
+
+# Create a ggplot with the average Y values corresponding to W
+ggplot(data = averages2, aes(x = time, y = mean_prices, color = projects)) +
+  geom_line() +
+  geom_vline(xintercept = 14, linetype = "dotted", color = "black") + # Adding the vertical line
+  labs(x = "Time", y = "Average prices", color = "Group") +
+  ylim(12,23) +
+  scale_color_manual(values = c("Treatment" = "blue", "Control" = "red")) +
+  theme_classic()
+
+```
+
+From the visual inspection, we might conclude that there can be parallel trends before treatment and that the treatment seems to have an effect (and not some other event). Thus, let us continue and try to more formality test these things.
+
+## Checking parallel trends
+
+After visual inspection of the average trend across the units in treatment and control, we try to more formally test the trend. 
+
+While we can estimate the trend in each treatment and control group (model 1a and 1b), we need a way to *test* whether the difference in coefficients is significant or more precisely whether there is actually no difference in the estimates for pre-treatment time trends between the two groups. 
+
+Again, an interaction model can facilitate this goal as the interaction captures the change in trend across the two groups (*Note:* This is estimated on pre-treatment data only).
+
+```{r}
+
+data1.pretreatment <- data1 %>% filter(time<15)
+
+# Run a linear regression on the pre-treatment data only
+model1a <- lm(prices ~ time, data = data1.pretreatment[data1.pretreatment$projects=="Treatment",])
+
+# Print the summary of the regression output
+tab_model(model1a, show.se = TRUE)
+
+model1b <- lm(prices ~ time, data = data1.pretreatment[data1.pretreatment$projects=="Control",])
+tab_model(model1b, show.se = TRUE)
+
+model1c <- lm(prices ~ time*projects, data = data1.pretreatment)
+tab_model(model1c, show.se = TRUE)
+```
+
+We do not only see that the trends are very similar, but that the difference in trends is also not significant, which suggest that the common trend assumption can be justified.
+
+Problem with the interaction test is that it is usually not very good at detecting problems with differences in pre-treatment trends because it is not very powerful if the pre-treatment period is small.
+
+## Estimating the basic DID regression equation
+
+We estimate the ATET (average treatment effect on the treated) in the diff-in-diff framework from the following regression model $Y_{it}=\alpha+ \beta_1 W_i+ \beta_2 POST_t + \beta_3 W_i \times POST_t$ where $\beta_3$ represents the $ATET_{DID}$.
+
+```{r}
+
+# Run a linear regression on the data to estimate the treatment effect
+model2 <- lm(prices ~ projects + policy + projects*policy, data = data1)
+tab_model(model2, show.se = TRUE)
+```
+
+The estimated treatment effect corresponds well with the treatment effect from the DGP which is -1.
+
+## Including fixed-effects in a panel regression
+
+In the following, we will try out different panel model fixed effects specifications. First, we will show that fixed effects are not enough in this case, before extending our DID model to include time and neighborhood fixed effects.
+
+
+### First: Using only fixed effects panel models (no DID)
+
+We will first estimate a simple model for a before-after policy effect controlling for neighborhood differences through the fixed-effects.
+
+Note: We cannot do two-way fixed-effects because the policy variable would be confounded with the time fixed-effects (perfectly collinear). 
+
+```{r}
+# Use specialized packages for panel regression such as plm or fixest
+
+# Here we use fixest using neighborhood as fixed effects
+model3a <- feols(prices ~ policy| neighborhood, data = data1)
+tab_model(model3a, show.se = TRUE)
+
+```
+
+The effect is heavily biased because it captures not only the treatment effect but also time trend effects.
+
+Thus, we will also include a linear time trend *(Note: the time trend in the DGP is roughly linear so the model should do quite well)*. However, this model will still not be enough to fully isolate the treatment effect as we can see.
+
+```{r}
+model3b <- feols(prices ~ policy + time| neighborhood, data = data1)
+tab_model(model3b, show.se = TRUE)
+```
+
+
+### Second: Using our fixed effects (two-way) DID model
+
+Now, we go back to our DID model and add two-way fixed effects. The focal DID estimate should not change, but adding additional fixed-effects can be advantageous because they can explain variation between neighborhoods and overtime that is not relevant for the treatment effect and not fully captured by the grouping variables (projects and policy).
+
+Thus, you should see that the fixed-effect estimator has smaller standard errors and tighter confidence intervals, because it better captures the heterogeneity at the neighborhood and time level. The requirement is that you have enough observations at the neighborhood and time level for reliable estimation of the effects, which we do in this example data.
+
+```{r}
+# Use specialized packages for panel regression such as plm or fixest
+
+# Fixest: using neighborhood and time as fixed effects
+model4a <- feols(prices ~ projects*policy| neighborhood + time, data = data1)
+
+# Print the summary of the regression output
+tab_model(model4a, show.se = TRUE)
+
+
+# Plm: Using the effect="twoways" to include both neighborhood and time fixed effects
+model4b <- plm(prices ~ projects*policy, data = data1, model="within", effect="twoways", index = c("neighborhood","time"))
+
+# Print the summary of the regression output
+tab_model(model4b, show.se = TRUE)
+```
+
+

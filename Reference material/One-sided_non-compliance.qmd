@@ -1,0 +1,500 @@
+---
+title: "Non compliance"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r setup, include=FALSE}
+# Load necessary packages
+library(sjPlot)
+library(kableExtra)
+library(AER)
+```
+
+# Introduction
+
+In this document, we will illustrate some of the treatment effects such as the ATET (average treatment effect on the treated), the ITT (intent to treat), and LATE when we have non-compliance, i.e., individuals where treatment assignment $T$ and treatment received $D$ must not be equal.
+
+# One-sided non-compliance (random)
+
+We will first look at an example of one-sided non-compliance, where individuals assigned to the treatment group only comply with 70% probability (i.e., actually receive treatment), while individuals assigned to the control group always comply. Thus, we have *compliers* and *never-takers*. The never-takers are a random subsample.
+
+## Data Generating Process
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r dgp1}
+# Set seed for reproducibility
+set.seed(13579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate treatment assignment
+# Treatment assignment is random
+T <- sample(0:1, size = n, replace = TRUE)
+
+# Generate potential outcomes
+E_y1 = 100
+E_y0 = 80
+Y1 <- rnorm(n, mean = E_y1, sd = 10)
+Y0 <- rnorm(n, mean = E_y0, sd = 10)
+
+# Create noncompliance in the treatment group
+compliance_prob <- 0.3  # Probability of compliance in the treatment group
+
+# Generate exposure assignment (only compliers and never-takers)
+D <- rep(0,n)
+D[T==1] <- sample(0:1, sum(T == 1), replace = TRUE, prob = c(compliance_prob, 1-compliance_prob))
+
+# The true average treatment effect / causal effect
+ate <- mean(Y1) - mean(Y0)
+
+# The true average treatment effect on the treated
+atet <- mean(Y1[D==1]) - mean(Y0[D==1])
+
+# Calculate the observed outcome based on exposure
+Y <- Y0 + (Y1-Y0)*D
+
+# Create a data frame
+data1 <- data.frame(T, D, Y, Y1, Y0)
+```
+
+**Note:** In contrast to previous DGPs, the observed outcome `Y` depends on the actually received treatment `D` and not on the assignment `T`.
+
+The dataset will consists of the following variables:
+
+-   `T`: Treatment assignment (1 if treatment, 0 if control).
+-   `D`: Treatment received (1 if treatment, 0 if no treatment).
+-   `Y`: Observed outcome.
+-   `Y1`: Potential outcome if treatment was received *(usually unobserved)*.
+-   `Y0`: Potential outcome if no treatment was received *(usually unobserved)*.
+
+Let's take a look at cross-table between `T` and `D`:
+
+```{r data-preview1, echo=FALSE, message=FALSE}
+table(T,D)/n
+```
+
+We can see that individuals assigned to control $T_i=0$ never receive treatment $D_i(T_i=0)=0$.
+
+In contrast, individuals assigned to treatment $T_i=1$ receive treatment (i.e., $D_i=1$.) only in about 70% of the time (i.e., compliers) and 30% do not receive treatment $D_i=1$ (i.e., never-takers).
+
+*Note: 70% for half of the sample: i.e., 70% \* 50% = 35%*
+
+## Estimation
+
+Now, we first want to estimate the ITT (intent to treat): $\tau_{ITT}=E[Y_i|T_i=1] - E[Y_i|T_i=0]$
+
+We can do this by estimating the following regression equation: $Y_i = \alpha + \beta T_i + \epsilon_i$
+
+Note: This is the same regression that we used before for estimating the ATE. However, we will now get a different treatment effect estimate, because we have one-sided non-compliance. Not all individuals assigned to treatment T will also comply (i.e., receive the treatment).
+
+```{r regression1, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model1 <- lm(Y ~ T, data = data1)
+
+# Print the summary of the regression output
+tab_model(model1, show.stat = TRUE)
+```
+
+The regression model again estimates the difference between the mean outcomes in the treatment and control groups, which is the ITT in this case.
+
+However, as we know the compliance rates, we can also estimate $LATE=ITT/ITT_D$ with $ITT_D=\mathbb{E}[D_i(T_i=1)]-\mathbb{E}[D_i(T_i=0)]$, the share of compliers.
+
+```{r interpretation1, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model1)$coefficients
+
+# Extract the estimated treatment effect
+itt_hat <- coef(model1)["T"]
+itt_confint <- confint(model1, "T")
+
+# Calculate share of compliers
+itt_d <- mean(D[T==1]) - mean(D[T==0])
+
+# Calculate LATE (or CACE)
+late_hat <- itt_hat / itt_d
+
+# Print the estimated treatment effect
+cat("The estimated ITT is", round(itt_hat, 2), "[", round(itt_confint,2), "]", "\n")
+cat("The estimated LATE is", round(late_hat, 2), "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(ate,2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(atet,2), "\n")
+
+# Print the share of compliers ITTd
+cat("The share of compliers is", round(itt_d,2))
+```
+
+We can see that the estimated ITT is different from the actual ATE, ATET, and LATE; while these are all almost equal because we have *randomized* treatment T and *random* non-compliance.
+
+However, in this situation, we could also use the treatment status D to estimate the treatment effect, because compliance is completely random. There should be no differences between untreated in the treatment group and untreated in the control group.
+
+```{r regression1b, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model1b <- lm(Y ~ D, data = data1)
+
+# Print the summary of the regression output
+tab_model(model1b, show.stat = TRUE)
+```
+
+We can see that the estimate is very close to the true ATE.
+
+## Observed Means
+
+We can also illustrate this by looking at the observed means for each status combinations.
+
+```{r prepfortable, echo=FALSE, message=FALSE}
+T1D1 <- round(mean(Y[D==1&T==1]),2)
+T1D0 <- round(mean(Y[D==0&T==1]),2)
+T0D0 <- round(mean(Y[D==0&T==0]),2)
+T1 <- round(mean(Y[T==1]),2)
+T0 <- round(mean(Y[T==0]),2)
+
+```
+
+The following table plots the observed `Y` for each of the groups to illustrate this situation.
+
+|                                | Treatment assigned $T_i=1$ | Control assigned $T_i=0$ |
+|--------------------------|-----------------------|-----------------------|
+| Treatment received $D_i=1$     | `r T1D1`                   | *not available*          |
+| Treatment not received $D_i=0$ | `r T1D0`                   | `r T0D0`                 |
+| Total (Average)                | `r T1`                     | `r T0`                   |
+
+
+The ITT is the difference between the total averages: `r T1-T0`
+
+Important here is that because the non-compliance is random, the potential outcomes of compliers and never-takers are not different.
+
+# One-sided non-compliance (non random)
+
+We will again look at an example of one-sided non-compliance, where individuals assigned to the treatment group only comply with 50% probability (i.e., actually receive treatment), while individuals assigned to the control group always comply. Thus, we have compliers and never-takers. 
+
+However, this time the never-takers are **not** a random subsample. Similar to be befor there is some selection based on observables.
+
+## Data Generating Process
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r dgp2}
+# Set seed for reproducibility
+set.seed(13579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate treatment assignment
+# Treatment assignment is random
+T <- sample(0:1, size = n, replace = TRUE)
+
+# Generate covariates
+X1 <- rnorm(n, mean = 50, sd = 10)
+X2 <- rpois(n, lambda = 5)
+X3 <- sample(c("Yes", "No"), size = n, replace = TRUE)
+
+X3 <- ifelse(X3 == "Yes", 1, 0)
+
+# Generate treatment received
+# Treatement received will be dependent on X1, X2, X3
+# Create a linear combination of covariates to form a log-odds for D
+log_odds_D <- -3.5 - 0.2 * X1 + 3 * X2 - 2 * X3
+
+# Calculate the probability of D being 1 using the logistic function
+prob_D_1 <- 1 / (1 + exp(-log_odds_D))
+
+# Generate D as binary treatment assignment (0 or 1) based on the probabilities
+D <- rbinom(n, 1, prob_D_1)
+
+# We will have compliers and never-takers, thus D(T=0)=1 is not possible
+D[T==0] <- 0
+
+# Generate potential outcomes with covariates
+E_y1 = 100
+E_y0 = 80
+Y1 <- E_y1 + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+Y0 <- E_y0 + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+
+# The true average treatment effect / causal effect
+ate <- mean(Y1) - mean(Y0)
+
+# The true average treatment effect on the treated
+atet <- mean(Y1[D==1]) - mean(Y0[D==1])
+
+# Calculate the observed outcome based on exposure
+Y <- Y0 + (Y1-Y0)*D
+
+# Create a data frame
+data2 <- data.frame(T, D, Y, Y1, Y0, X1, X2, X3)
+```
+
+Let's take a look at cross-table between `T` and `D`:
+
+```{r data-preview2, echo=FALSE, message=FALSE}
+table(T,D)/n
+```
+
+We can see that individuals assigned to control $T_i=0$ never receive treatment $D_i(T_i=0)=0$.
+
+In contrast, individuals assigned to treatment $T_i=1$ receive treatment (i.e., $D_i=1$.) only in about 50% of the time (i.e., compliers) and 50% do not receive treatment $D_i=1$ (i.e., never-takers).
+
+*Note: 50% for half of the sample: i.e., 50% \* 50% = 25%*
+
+## Estimation
+
+Now, we again estimate the ITT (intent to treat) using treatment assignment `T`: $\tau_{ITT}=E[Y_i|T_i=1] - E[Y_i|T_i=0]$
+
+```{r regression2, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model2 <- lm(Y ~ T, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2, show.stat = TRUE)
+```
+
+The regression model again estimates the ITT as the difference between the mean outcomes in the treatment and control groups.
+
+```{r interpretation2, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model2)$coefficients
+
+# Extract the estimated treatment effect
+itt_hat <- coef(model2)["T"]
+itt_confint <- confint(model2, "T")
+
+# Calculate share of compliers
+itt_d <- mean(D[T==1]) - mean(D[T==0])
+
+# Calculate LATE (or CACE)
+late_hat <- itt_hat / itt_d
+
+# Print the estimated treatment effect
+cat("The estimated ITT is", round(itt_hat, 2), "[", round(itt_confint,2), "]", "\n")
+cat("The estimated LATE is", round(late_hat, 2), "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(ate,2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(atet,2), "\n")
+```
+
+We can see again that there are differences between ITT and ATE, but the estimated LATE comes close to the ATE and ATET. This is because we have selection effect in compliance, but no treatment effect heterogeneity.
+
+Selection effects in compliance are no problem for LATE if there is no treatment effect heterogeneity. However, in this case, where compliance is not random, we cannot use the treatment received to estimate treatment effects. 
+
+```{r regression2b, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model2b <- lm(Y ~ D, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2b, show.stat = TRUE)
+```
+
+The above estimate is different from the ATE, ATET, LATE. Thus, this regression is not meaningful in this situation. We cannot use treatment received if it is not random (even though treatment assignment was random).
+
+There are differences between untreated in the treatment group and untreated in the control group due to selection effects. We would need to identify the ones who would have been treated had they not been in the control group (through including the selection variables as covariates in the regression) or use the LATE, which basically does this without the need for the variables.
+
+```{r regression2c, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model2c <- lm(Y ~ D + X1 + X2 + X3, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2c, show.stat = TRUE)
+```
+
+Later in the class, we will see that the LATE is a form of instrumental variable estimator.
+
+BTW: How to retrieve the standard errors, test-statistic and confidence intervals for LATE?
+
+```{r regression2d, echo=TRUE}
+tab_model(ivreg(Y ~ D | T, data = data2), show.stat = TRUE)
+
+```
+
+## Observed means
+
+This can again be illustrated by looking at the observed `Y` for each of the groups:
+
+```{r prepfortable2, echo=FALSE, message=FALSE}
+T1D1 <- round(mean(Y[D==1&T==1]),2)
+T1D0 <- round(mean(Y[D==0&T==1]),2)
+T0D0 <- round(mean(Y[D==0&T==0]),2)
+T1 <- round(mean(Y[T==1]),2)
+T0 <- round(mean(Y[T==0]),2)
+
+```
+
+|                                | Treatment assigned $T_i=1$ | Control assigned $T_i=0$ |
+|--------------------------|-----------------------|-----------------------|
+| Treatment received $D_i=1$     | `r T1D1`                   | *not available*          |
+| Treatment not received $D_i=0$ | `r T1D0`                   | `r T0D0`                 |
+| Total (Average)                | `r T1`                     | `r T0`                   |
+
+There are differences between untreated in control and treatment group. This iis because never-takers and compliers have different potential outcomes.
+
+# One-sided non-compliance (non random; effect heterogeneity)
+
+Same as before, we have one-sided non-compliance, where individuals assigned to the treatment group only comply with 50% probability (i.e., actually receive treatment), while individuals assigned to the control group always comply. 
+
+Thus, we have compliers and never-takers and the never-takers are **not** a random subsample but self-selected. In addition, we will have treatment effect heterogeneity between treated and untreated (i.e., ATE $\neq$ ATET).
+
+## Data Generating Process
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r dgp3}
+# Set seed for reproducibility
+set.seed(13579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate treatment assignment
+# Treatment assignment is random
+T <- sample(0:1, size = n, replace = TRUE)
+
+# Generate covariates
+X1 <- rnorm(n, mean = 50, sd = 10)
+X2 <- rpois(n, lambda = 5)
+X3 <- sample(c("Yes", "No"), size = n, replace = TRUE)
+
+X3 <- ifelse(X3 == "Yes", 1, 0)
+
+# Generate treatment received
+# Treatement received will be dependent on X1, X2, X3
+# Create a linear combination of covariates to form a log-odds for D
+log_odds_D <- -3.5 - 0.2 * X1 + 3 * X2 - 2 * X3
+
+# Calculate the probability of D being 1 using the logistic function
+prob_D_1 <- 1 / (1 + exp(-log_odds_D))
+
+# Generate D as binary treatment assignment (0 or 1) based on the probabilities
+D <- rbinom(n, 1, prob_D_1)
+
+# We will have compliers and never-takers, thus D(T=0)=1 is not possible
+D[T==0] <- 0
+
+# Generate potential outcomes with covariates and effect heterogeneity
+E_y1 = 100
+E_y0 = 80
+Y1 <- E_y1 + 10*D + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+Y0 <- E_y0 + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+
+# The true average treatment effect / causal effect
+ate <- mean(Y1) - mean(Y0)
+
+# The true average treatment effect on the treated
+atet <- mean(Y1[D==1]) - mean(Y0[D==1])
+
+# Calculate the observed outcome based on exposure
+Y <- Y0 + (Y1-Y0)*D
+
+# Create a data frame
+data3 <- data.frame(T, D, Y, Y1, Y0)
+```
+
+Let's take a look at cross-table between `T` and `D`:
+
+```{r data-preview3, echo=FALSE, message=FALSE}
+table(T,D)/n
+```
+
+This is similar to the previous situation.
+
+## Estimation
+
+```{r regression3, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model3 <- lm(Y ~ T, data = data3)
+
+# Print the summary of the regression output
+tab_model(model3, show.stat = TRUE)
+```
+
+The regression model again estimates the ITT as the difference between the mean outcomes in the treatment and control groups.
+
+```{r interpretation3, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model3)$coefficients
+
+# Extract the estimated treatment effect
+itt_hat <- coef(model3)["T"]
+itt_confint <- confint(model3, "T")
+
+# Calculate share of compliers
+itt_d <- mean(D[T==1]) - mean(D[T==0])
+
+# Calculate LATE (or CACE)
+late_hat <- itt_hat / itt_d
+
+# Print the estimated treatment effect
+cat("The estimated ITT is", round(itt_hat, 2), "[", round(itt_confint,2), "]", "\n")
+cat("The estimated LATE is", round(late_hat, 2), "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(ate,2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(atet,2), "\n")
+```
+
+While the ITT is again different from the ATE and ATET. The estimated LATE comes close to the ATET, but not the ATE, because of the treatment effect heterogeneity (actually treated have higher potential outcomes when treated than untreated).
+
+Remember: The LATE estimates the ATET and only if we have no treatment effect heterogeneity (i.e., ATET = ATEU) this will be equal to the ATE.
+
+Again, when using the treatment assignment D to estimate effects will not match because of the selection effects and treatment effect heterogeneity.
+
+```{r regression3b, echo=TRUE}
+
+# Run a linear regression on the data to estimate the treatment effect
+model3b <- lm(Y ~ D , data = data3)
+
+# Print the summary of the regression output
+tab_model(model3b, show.stat = TRUE)
+```
+
+The estimate is different from the ATE and ATET. This regression is not meaningful in this case.
+
+## Observed means
+
+```{r prepfortable3, echo=FALSE, message=FALSE}
+T1D1 <- round(mean(Y[D==1&T==1]),2)
+T1D0 <- round(mean(Y[D==0&T==1]),2)
+T0D0 <- round(mean(Y[D==0&T==0]),2)
+T1 <- round(mean(Y[T==1]),2)
+T0 <- round(mean(Y[T==0]),2)
+
+```
+
+The following table plots the observed `Y` for each of the groups:
+
+|                                | Treatment assigned $T_i=1$ | Control assigned $T_i=0$ |
+|--------------------------|-----------------------|-----------------------|
+| Treatment received $D_i=1$     | `r T1D1`                   | *not available*          |
+| Treatment not received $D_i=0$ | `r T1D0`                   | `r T0D0`                 |
+| Total (Average)                | `r T1`                     | `r T0`                   |
+
+The ITT is the difference between the total averages: `r T1-T0`
+
+# Conclusion
+
+Even though treatment assignment is randomized we may not get average treatment effects (ATE) if there is non-compliance with the assignment. In such a situation, using treatment *assignment* T to estimate effects *only* gives us an estimate of the ITT (intend to treat).
+
+If we know how has actually received treatment (i.e., D), we can use this information to estimate the LATE (local average treatment effect).
+
+LATE can be used under one-sided non-compliance to estimate the ATET (and ATE if no heterogeneity), while we usually should not use the actual treatment status D directly in a regression to estimate treatment effects because there can be selection in compliance. Only if compliance is random (i.e., independent of potential outcomes), we may use D directly to estimate treatment effects.

@@ -1,0 +1,163 @@
+---
+title: "Frisch-Waugh-Lowell Theorem"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+```
+
+# Introduction
+
+In this document, I will illustrate the Frisch-Waugh-Lowell theorem on the simple regression example that we have used in lecture 3 (unconfoundedness.qmd).
+
+# Data Generating Process
+
+We will use the same DGP as earlier and generate a dataset of 10 000 observations.
+
+```{r}
+#| label: data-generation
+
+# Set seed for reproducibility
+set.seed(13579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate covariates
+X1 <- rnorm(n, mean = 50, sd = 10)
+X2 <- rpois(n, lambda = 5)
+X3 <- sample(c("Yes", "No"), size = n, replace = TRUE)
+
+X3 <- ifelse(X3 == "Yes", 1, 0)
+
+# Generate treatment assignment
+# Treatement assignment will be dependent on X1, X2, X3
+# Create a linear combination of covariates to form a log-odds for T
+log_odds_T <- -3.5 - 0.2 * X1 + 3 * X2 - 2 * X3
+
+# Calculate the probability of T being 1 using the logistic function
+prob_T_1 <- 1 / (1 + exp(-log_odds_T))
+
+# Generate T as binary treatment assignment (0 or 1) based on the probabilities
+T <- rbinom(n, 1, prob_T_1)
+
+# Generate potential outcomes with covariates
+E_y1 = 100
+E_y0 = 80
+Y1 <- E_y1 + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+Y0 <- E_y0 + 0.5*X1 + 2*X2 - 10*X3 + rnorm(n, mean = 0, sd = 5)
+
+# The true average treatment effect / causal effect
+tau <- mean(Y1) - mean(Y0)
+
+# Calculate the observed outcome based on treatment assignment
+Y <- Y0 + (Y1-Y0)*T
+
+# Create a data frame
+data <- data.frame(T, Y, Y1, Y0, X1, X2, X3)
+```
+
+# Standard full regression
+
+We estimate the following full regression equation: $Y_i = \alpha + \beta T_i + \gamma X_i + \epsilon_i$ This is the regression that we have used in lecture 3 to get an unbiased estimate of $\beta$ (i.e., the average treatment effect in this case) using all (three) covariates. We have conditional independence given these three covariates (i.e., ${Y_i (1) - Y_i (0)} \perp T_i | X_i$).
+
+Our model is also linear so that regression adjustment works sufficiently well.
+
+```{r}
+#| label: regression1
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model1 <- lm(Y ~ T + X1 + X2 + X3, data = data)
+
+# Print the summary of the regression output
+tab_model(model1, show.se = TRUE)
+```
+
+The true treatment effect is 20 and that is what we also roughly get from the parameter estimate of T.
+
+# One step orthogonalization
+
+We now first orthogonalize T with respect to the covariates, i.e., we regress T on X and use the residuals $\widetilde{T_i}$ from this first stage regression.
+
+We then estimate the following regression equation: $Y_i = \alpha + \beta \widetilde{T_i} + \psi_i$ .
+
+```{r}
+#| label: regression2
+#| echo: true
+
+model2a <- lm(T ~ X1 + X2 + X3, data = data)
+
+data$T_tilde <- residuals(model2a)
+
+# Run a linear regression on the data to estimate the treatment effect
+model2b <- lm(Y ~ T_tilde, data = data)
+
+# Print the summary of the regression output
+tab_model(model2b, show.se = TRUE)
+```
+
+We get the same coefficient for $\beta$ as in the full regression. However, we get quite different standard errors. The standard errors are much larger and thus confidence intervals are wider.
+
+Thus, while the parameter estimate is correct, this type of regression should actually **not be used**, because inference is incorrect.
+
+# Double orthogonalization
+
+We now not only orthogonalize T with respect to the covariates X (i.e., we use the residuals from a regression with T on X) but also orthogonalize Y with respect to the covariates X.
+
+We estimate the following regression equation: $\widetilde{Y_i} = \alpha + \beta \widetilde{T_i} + \psi_i$
+
+```{r}
+#| label: regression3
+#| echo: true
+
+model3a <- lm(Y ~ X1 + X2 + X3, data = data)
+
+data$Y_tilde <- residuals(model3a)
+
+# Run a linear regression on the data to estimate the treatment effect
+model3b <- lm(Y_tilde ~ 0 + T_tilde, data = data)
+
+# Print the summary of the regression output
+tab_model(model3b, show.se = TRUE)
+```
+
+We again get the same coefficient for $\beta$ as in the full regression, but now we also get the same standard errors and confidence interval as in the full regression.
+
+*Small note: The FWL requires the use of a regression without an intercept in order to obtain the appropriate model. Usually, estimating the model with an intercept does not change the results much, because the intercept is expected to be zero. However, as it will never actually be zero, this can introduce unnecessary uncertainty and imprecision.*
+
+# Don't do this
+
+Some of you might wonder, whether it would also work if we only orthogonalize Y with respect to the covariates X and use T directly?
+
+```{r}
+#| label: regression4
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model4 <- lm(Y_tilde ~ T, data = data)
+
+# Print the summary of the regression output
+tab_model(model4, show.se = TRUE)
+```
+
+As you can see, it does not provide the same estimate for $\beta$. Only orthogonalizing Y is not sufficient unless the X have no effect on T (i.e., they are not confounders but only neutral control variables).
+
+# Conclusion
+
+The Frisch-Waugh-Lowell theorem tells us that there are different ways to estimate a single regression coefficient. We can use the standard full regression approach, but we can also reduce the estimation to a single bivariate model. This is often called the **partially linear treatment effect** model.
+
+Why should we do this three step estimation?
+
+One of the main advantages is that we can separate the estimation of the focal effect of T and that of the covariate model. We could, for example, use more flexible non-linear models to represent the effects of the covariates X on both Y and T, while we continue to estimate a simple linear and parametric model for the effect of T on Y. This is what we will do in *doubleML*.

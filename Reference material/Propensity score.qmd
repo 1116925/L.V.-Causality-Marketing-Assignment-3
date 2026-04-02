@@ -1,0 +1,423 @@
+---
+title: "Propensity Scores"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+library(ggplot2)
+library(MatchIt)
+
+library(AIPW)
+library(SuperLearner)
+library(WeightIt)
+```
+
+# Introduction
+
+In this document, we will discuss the concept of propensity scores and how to estimate them.
+
+The propensity score measures the probability of being treated conditional on the observed covariates and is defined as:
+
+$$p(X_i)=P(T_i=1|X_i)$$
+
+In an ideal randomized experiment with two equally sized groups (i.e., $T_i ∈\{0, 1\} ⊥ X_i$), the propensity score is constant at 0.5, since the probability of being treated is equal to the probability of being untreated. More generally, for randomized $T_i$, we have $p(X_i) = p_0 ∈ (0,1)$, where $p_0$ is the true propensity score ranging between zero and one, depending on the group sizes.
+
+However, in practice, the actual propensity score even for randomized experiments is rarely constant because randomization is rarely perfect in finite samples. Thus, we usually do not know the propensity scores $p(X_i)$ but can estimate $\hat{p}(X_i)$. Many methods are available to estimate the propensity score, including logistic regression, classification trees, and other machine learning algorithms.
+
+One use of the propensity score is to balance the covariates between treatment and control groups. By matching or weighting observations based on their estimated propensity scores, we can create comparable groups of treated and untreated individuals in terms of their observed covariates. This reduces the bias due to confounding and improves the precision of the treatment effect estimate. We discuss this in more detail in the "matching" lecture.
+
+Another use of the propensity score is to assess how close a given dataset is to an ideal randomized experiment. Looking at the distribution and variability of the (estimated) propensity scores gives a measure of how far we are from a randomized experiment. If the propensity scores are well balanced between treatment and control groups and tightly distributed around 0.5 (for equally sized groups), we can have more confidence in the validity of the treatment effect estimate. If the propensity scores are imbalanced, we may need to adjust for more covariates or consider alternative methods for estimating the treatment effect.
+
+The propensity score can even be used to estimate individual treatment effects. These estimates are extremely noisy and not very much practically relevant, but can be used for techniques that try to uncover treatment effect heterogeneity.
+
+In this document, we want to look at the basic of propensity scores and how to estimate them using logistic regression. We will first use a DGP with randomized `T`. Afterwards we will use the DGP where `T` depends on `X` (i.e., selection on observables) scenario.
+
+# Randomized experiment
+
+We will reuse the DGP from our first document (potential outcome framework).
+
+```{r}
+#| label: data-generation
+
+# Set seed for reproducibility
+set.seed(13579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate treatment assignment
+# Treatement assignment here will be random
+T <- sample(0:1, size = n, replace = TRUE)
+
+# Generate covariates
+X1 <- rnorm(n, mean = 50, sd = 10)
+X2 <- rpois(n, lambda = 5)
+X3 <- sample(c("Yes", "No"), size = n, replace = TRUE)
+
+X3 <- ifelse(X3 == "Yes", 1, 0)
+
+# Generate potential outcomes with covariates
+E_y1 = 100
+E_y0 = 80
+Y1 <- E_y1 + 0.5*X1 - 2*X2 + 3*X3 + rnorm(n, mean = 0, sd = 5)
+Y0 <- E_y0 + 0.5*X1 - 2*X2 + 3*X3 + rnorm(n, mean = 0, sd = 5)
+
+# The true average treatment effect / causal effect
+tau <- mean(Y1) - mean(Y0)
+
+# Calculate the observed outcome based on treatment assignment
+Y <- Y0 + (Y1-Y0)*T
+
+# Create a data frame
+data <- data.frame(T, Y, Y1, Y0, X1, X2, X3)
+
+```
+
+We can estimate the propensity score in R using the `glm()` function to fit a logistic regression model. The propensity scores are the predicted outcomes of the logistic regression with the treatment assignment `T` as dependent variable and the covariates `X` as predictors. These predicted outcomes are the estimated probabilities of treatment assignment given the covariates.
+
+We can then estimate the propensity scores for each observation using the `predict()` function and specify `type = "response"` to get the predicted probabilities of being treated. Finally, we can display a plot of the distribution using a histogram.
+
+```{r}
+#| label: propensity-scores
+#| echo: true
+
+# Fit a logistic regression model for the propensity score
+model_prop <- glm(T ~ X1 + X2 + X3, data = data, family = binomial())
+
+# Estimate the propensity scores for each observation
+prop_scores <- predict(model_prop, type = "response")
+
+# Display summary statistics of the propensity scores
+summary(prop_scores)
+hist(prop_scores)
+```
+
+We can see that the propensity scores are tightly centered around 0.5 with rather small variability. This indicates that the treatment assignment is more or less independent of the covariates. All individuals have an almost 50/50 chance of being selected into treatment.
+
+*Note:* A constant propensity score of 0.5 would indicate perfect independence of the covariates (e.g., randomization), which however is unusual for finite samples.
+
+**Important:** We are always estimating the propensity scores based on covariates. Thus, it only tells us something about the covariates (X) that are observed. It cannot tell us whether T depends on some covariates that are not observed (i.e., whether we have selection on unobservables).
+
+# Selection effects
+
+We will now re-use a modified version of the DGP from our lecture 3 (unconfoundedness document).
+
+```{r}
+#| label: data-generation2
+
+rm(list = ls())
+
+# Set seed for reproducibility
+set.seed(16579)
+
+# Define the number of observations
+n <- 10000
+
+# Generate covariates
+X1 <- round(rnorm(n, mean = 50, sd = 10),0)
+X2 <- rpois(n, lambda = 5)
+X3 <- sample(c("Yes", "No"), size = n, replace = TRUE)
+
+X3 <- ifelse(X3 == "Yes", 1, 0)
+
+# Generate treatment assignment
+# Treatement assignment will be dependent on X1, X2, X3
+# Create a linear combination of covariates to form a log-odds for T
+log_odds_T <- -1.2 - 0.1 * X1 + 1 * X2 + 2 * X3 + rnorm(n, mean = 0, sd = 1)
+
+# Calculate the probability of T being 1 using the logistic function
+prob_T_1 <- 1 / (1 + exp(-log_odds_T))
+
+# Generate T as binary treatment assignment (0 or 1) based on the probabilities
+T <- rbinom(n, 1, prob_T_1)
+
+# Generate potential outcomes with covariates
+E_y1 = 1520
+E_y0 = 1500
+Y1 <- E_y1 - 10*log(X1) + 0.2*X1^2 - 2*X2 + 0.5*X2^2 - 0.5*X2^3 + 120*X3 + rnorm(n, mean = 0, sd = 5)
+Y0 <- E_y0 - 10*log(X1) + 0.2*X1^2 - 2*X2 + 0.5*X2^2 - 0.5*X2^3 + 120*X3 + rnorm(n, mean = 0, sd = 5)
+
+# The true average treatment effect / causal effect
+tau <- mean(Y1) - mean(Y0)
+
+# Calculate the observed outcome based on treatment assignment
+Y <- round(Y0 + (Y1-Y0)*T,0)
+
+# Create a data frame
+data2 <- data.frame(T, Y, Y1, Y0, X1, X2, X3)
+
+data2.export <- data2[,-c(3,4)]
+
+colnames(data2.export) <- c("Discount","Sales", "Age", "Prev_Purch", "Loyalty_card")
+
+write.table(data2.export, "Matching_example_data.csv", sep = ";", row.names = FALSE)
+```
+
+## The propensity score model
+
+We again estimate the propensity score in R using the `glm()` function to fit a logistic regression model.
+
+```{r}
+#| label: propensity-scores1
+#| echo: true
+
+# Fit a logistic regression model for the propensity score
+model_prop <- glm(T ~ X1 + X2 + X3, data = data2, family = binomial())
+
+# Estimate the propensity scores for each observation
+data2$ps <- predict(model_prop, type = "response")
+
+# Display the distribution of propensity scores
+ggplot(data2, aes(x = ps)) + geom_histogram(binwidth = .1, fill = "light blue", color = "black") + theme_classic()
+
+mean(data2$ps)
+```
+
+While the propensity scores are still centered around 0.5 (i.e., indicating that treatment and non-treatment are distributed equally), we see that they now have a much wider spread. In fact, they cover the whole interval between zero and one. Depending on the covariates `X` some individuals have very high or low probability of being selected.
+
+We can also see that the propensity scores are different for the treated and the control group. The propensity of being selected into treatment based on the X is higher for the treatment group than the control group. This indicates strong selection effects.
+
+```{r}
+#| label: propensity-scores2
+#| echo: true
+
+# Create bins for propensity scores
+breaks <- c(0, seq(0.1, 0.9, by = 0.1), 1)
+propensity_bins <- cut(data2$ps, breaks = breaks)
+
+# Create a table of propensity score to actual assignment
+propensity_table <- as.data.frame.matrix(table(propensity_bins, T))
+colnames(propensity_table) <- c("Control (T=0)", "Treated (T=1)")
+
+ggplot(data2, aes(x = ps, fill=as.factor(T))) + geom_histogram(binwidth = .1, alpha = 0.2, color = "black") + theme_classic()
+
+# Print the table
+kable(propensity_table)
+```
+
+The table and the previous chart show that there is overlap / common support, but that the overlap is not very large for many of the extreme observations. 
+
+---
+
+To assess the quality of the propensity score model it is usually advisable to look at the confusion matrix of the treatment predictions to assess the quality of the classification model:
+
+```{r}
+# Make predictions
+predicted_classes <- ifelse(data2$ps >= 0.5, 1, 0)
+
+# Create the confusion matrix
+kable(table(data2$T, predicted_classes)/n)
+```
+
+Here, the predictive model seems to be quite good, with relatively high accuracy, precision, and recall. 
+
+## Estimating the treatment effect - Regression adjustment
+
+Now, we try to estimate the treatment effect. From lecture 3, we know that the effect is bias in this scenario as we have selection effects.
+
+```{r}
+# Run a linear regression without covariates to estimate the naive treatment effect
+lm.model <- lm(Y ~ T, data = data2)
+
+# Print the summary of the regression output
+tab_model(lm.model)
+```
+
+The effect is heavily biased because of the selection effects. The true effect is `r round(tau,3)` but the estimated effect from this simple linear regression without further controls is `r round(coef(lm.model)[2],3)`.
+
+Next, we attempt to do regression adjustment. Regression adjustment assumes linear dependencies among all variables. This assumption is violated in this case, but we want to see what happens.
+
+```{r}
+# Run a linear regression with covariates to estimate the treatment effect
+lm.model <- lm(Y ~ T + X1+X2+X3, data = data2)
+
+# Print the summary of the regression output
+tab_model(lm.model)
+```
+
+This estimate is still biased (not as worse as before), because we are not correctly representing the true outcome model (which includes nonlinearities).
+
+## Estimating the treatment effect - Inverse propensity weighting (IPW)
+
+```{r}
+# Compute the inverse propensity weights (IPW)
+data2$ipw <- (data2$T - data2$ps)/(data2$ps*(1 - data2$ps))
+data2$ipw <- (data2$T / data2$ps)-((1 - data2$T)/(1 - data2$ps))
+
+# Compute the IPW estimate
+ATE.ipw <- mean(data2$Y*data2$ipw)
+ATE.ipw
+
+# With additional truncation of the propensity scores for stability
+data2$ps_t  <- pmax(0.001, pmin(0.999, data2$ps))
+data2$ipw_t <- (data2$T - data2$ps_t)/(data2$ps_t*(1-data2$ps_t))
+
+ATE.ipw_t <- mean(data2$Y*data2$ipw_t)
+ATE.ipw_t
+
+```
+Here, the IPW is also quite a bit off, regardless of truncated or untruncated calculation. The problem is that the IPW has quite large sampling variance and thus on finite samples you may observe some deviations from the true estimate.
+
+```{r}
+# There is an alternative way to calculate the IPW using a different N
+# In the previous we divided by N (i.e., mean is equal to sum*(1/N))
+# However, in finite samples the weights typically do not sum to N, thus the alternative estimator uses the sum of weights as denominator
+
+ATE.ipw <- sum(data2$Y*(data2$T / data2$ps))*(1/n) - sum(data2$Y*((1 - data2$T)/(1 - data2$ps)))*(1/n)
+ATE.ipw
+
+ATE.ipw_alt <- sum(data2$Y*(data2$T / data2$ps))*(1/sum((data2$T / data2$ps))) - sum(data2$Y*((1 - data2$T)/(1 - data2$ps)))*(1/sum(((1 - data2$T)/(1 - data2$ps))))
+
+# We get the same estimate when using the absolute weights in a weighted regression
+lm.ipw <- lm(formula = Y ~ T, data = data2, weights = abs(ipw))
+tab_model(lm.ipw)
+
+# The advantage is that this gives us standard errors, but they are still too small
+
+# Estimating the IPW through a ready made package which also include inference statistics
+ipw.out <- weightit(T ~ X1 + X2 + X3, data = data2, method="glm")
+lm.ipw <- lm_weightit(Y ~ T, data = data2, weightit = ipw.out)
+summary(lm.ipw, ci = TRUE)
+
+```
+
+
+## Estimating the treatment effect - Propensity score matching
+
+```{r}
+# Perform propensity score matching using the MatchIt package
+psm.out <- matchit(T ~ X1 + X2 + X3, data = data2, method = "nearest", distance = "glm", replace = TRUE)
+
+psm.out
+
+summary(psm.out)
+
+plot(psm.out, type = "jitter", interactive = FALSE)
+
+plot(psm.out, type = "density", interactive = FALSE, which.xs = ~X1 + X2 + X3)
+
+m.data <- match.data(psm.out)
+
+lm.match <- lm(Y ~ T, data = m.data, weights = weights)
+
+tab_model(lm.match)
+
+```
+
+
+## Estimating the treatment effect - Augmented inverse propensity weighting (AIPW)
+
+In the following, I will outline the AIPW estimator and show that the three equations from the slides provide the same estimate and thereby how the AIPW estimator can be decomposed.
+
+The first equation is the one that we typically find in the literature.
+
+```{r}
+#########################################################
+# Variant 1: Two learner (T-learner)  for outcome model
+# Outcome model in treatment and control is allowed to be different
+#########################################################
+# Compute the double robust AIPW estimate
+lm.mu0 <- lm(Y ~ X1+X2+X3, data = data2[data2$T==0,])
+lm.mu1 <- lm(Y ~ X1+X2+X3, data = data2[data2$T==1,])
+
+mu0 <- predict(lm.mu0, newdata = data2)
+mu1 <- predict(lm.mu1, newdata = data2)
+
+ATE.aipw <- mean(mu1 + (data2$T/data2$ps)*(data2$Y-mu1)) - mean(mu0 + ((1-data2$T)/(1-data2$ps))*(data2$Y-mu0)) 
+
+ATE.aipw
+
+#########################################################
+# Variant 2: Single learner (S-learner) for outcome model
+# Outcome model in treatment and control is the same
+#########################################################
+
+# Standard linear regression for the outcome
+lm.mu <- lm(Y ~ T + X1 + X2 + X3, data = data2)
+
+mu1 <- predict(lm.mu, newdata = transform(data2, T = 1))
+mu0 <- predict(lm.mu, newdata = transform(data2, T = 0))
+
+ATE.aipw <- (1/n)*sum(mu1 + (data2$T/data2$ps)*(data2$Y-mu1)) - (1/n)*sum(mu0 + ((1-data2$T)/(1-data2$ps))*(data2$Y-mu0)) 
+
+ATE.aipw
+
+# We can also do the mean later to be able to show the distribution of aipw estimates
+# This basically calculates an individual respondent's treatment effect
+data2$aipw <- (mu1 + (data2$T/data2$ps)*(data2$Y-mu1)) - (mu0 + ((1-data2$T)/(1-data2$ps))*(data2$Y-mu0)) 
+
+ATE.aipw <- mean(data2$aipw)
+ATE.aipw
+
+```
+
+Both the T-learner and the S-learner provide quite similar results as there is no treatment effect heterogeneity in this example. They are also closer to the true treatment effect (`r round(tau,3)`).
+
+As discussed in class, it can also be shown that it has less variance.
+
+Next, we will use the second equation that decomposes the AIPW into the regression estimate of the ATE (you can verify that it is the same as when doing regression adjustments with covariates above) and the propensity score adjustment
+
+```{r}
+ATE.reg <- mean(mu1 - mu0) 
+ATE.prop.correction <- mean((data2$T/data2$ps)*(data2$Y-mu1) - ((1-data2$T)/(1-data2$ps))*(data2$Y-mu0)) 
+ATE.aipw2 <- ATE.reg + ATE.prop.correction
+
+ATE.reg
+ATE.prop.correction
+ATE.aipw2
+```
+
+Finally, we can decompose the AIPW also into the IPW and an outcome model adjustment (here regression model adjustment).
+
+```{r}
+
+ATE.reg.adjust <- mean(((data2$ps-data2$T)/data2$ps)*mu1 - ((data2$T-data2$ps)/(1-data2$ps)) * mu0)
+ATE.aipw3 <- ATE.ipw + ATE.reg.adjust
+
+ATE.reg.adjust
+ATE.aipw3
+```
+
+Remember, the true ATE was `r round(tau,3)`
+
+---
+
+Instead of doing the calculations ourselves, we can also use a ready made package to estimate the AIPW in R, which also provides inference statistics (standard errors, confidence intervals).
+
+```{r}
+aipw_object <- AIPW$new(
+    Y = data2$Y,
+    A = data2$T,
+    W = data2[,c("X1","X2","X3")],
+    Q.SL.library = c("SL.lm"),
+    g.SL.library = c("SL.glm"),
+    k_split = 1 # Do not use cross-fitting
+)$fit()
+
+# Show summary of result without truncation (g.bound=0)
+aipw_object$summary(g.bound = 0)
+  
+```
+
+This package also allows to specify different learners for the outcome model and the propensity score model. We are thus moving to the next topic which is Machine Learning meets causal inference. Where we will also learn about another technique which is double debiased ML.
+
+# Different ways of estimating propensity scores
+
+The most common method in econometrics has been the use of logistic regression to estimate the propensity score. It is easy to implement and well understood by econometricians trained in traditional statistics. However, advances in machine-learning has made other means of estimating the propensity score popular: e.g., classification trees, random forest, etc., that may perform better if the relationship between covariates and treatment assignment is complex and non-linear.
+
+However, they are often prone to overfitting and need some form of regularization to actually create propensity scores that are useful for the purposes where we will need them. In fact, the predictive quality of the propensity score does not necessarily translate into its balancing properties. Some research shows that fancy ML methods may not be better (but worse) than old-school logistic regression in reducing the confounding bias. Or we need to apply methods such a cross-fitting which we will discuss in the next section.
+
+# Conclusion
+
+In this document, I discuss the basics of propensity scores and how to estimate them using logistic regression. I also show how to use propensity scores for the IPW and AIPW estimator and in matching.

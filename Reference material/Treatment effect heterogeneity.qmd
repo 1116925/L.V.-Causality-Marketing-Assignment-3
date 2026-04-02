@@ -1,0 +1,573 @@
+---
+title: "Treatment effect heterogeneity"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+library(ggplot2)
+```
+
+# Introduction
+
+In this document we will discuss different types of treatment effect heterogeneity. First, we will repeat selection on returns and how to address them in a regression framework. Then, we will move on to the CATE (conditional average treatment effect) and treatment effect heterogeneity in randomized experiments (moderators).
+
+# Selection on returns (i.e., ATET $\neq$ ATEU)
+
+In this case, we are taking up the third example from lecture 3. We are specifying a situation, where we have treatment effect heterogeneity (in the form of selection on returns) but no selection bias in the untreated outcomes, i.e., $E[Y_i(0)|T_i=1] = E[Y_i(0)|T=0]$
+
+## Data Generating Process
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r}
+#| label: data-generation1
+
+# Set seed for reproducibility
+set.seed(13573)
+
+# Define the number of observations
+n <- 10000
+
+# Generate covariates
+X1 <- sample(c("Yes", "No"), size = n, replace = TRUE) # Some individual characteristic that explains why getting a university degree might be more effective (e.g., wants to work in IT)
+
+# Convert X1 to a binary indicator
+X1 <- ifelse(X1 == "Yes", 1, 0)
+
+# Generate treatment assignment
+# Treatment assignment will be dependent on X1
+# Create a linear combination of covariates to form a log-odds for T
+log_odds_T <- -3.25 + 6.5 * X1 + rnorm(n, mean = 0, sd = 1)
+
+# Calculate the probability of T being 1 using the logistic function
+prob_T_1 <- 1 / (1 + exp(-log_odds_T))
+
+# Generate T as binary treatment assignment (0 or 1) based on the probabilities
+T <- rbinom(n, 1, prob_T_1)
+
+# Generate potential outcomes with covariates
+# In this case the covariate only affects the treatment outcomes
+E_y1 = 50
+E_y0 = 40
+Y1 <- E_y1 + 10*X1 + rnorm(n, mean = 0, sd = 10)
+Y0 <- E_y0 + rnorm(n, mean = 0, sd = 10)
+
+# Calculate the observed outcome based on treatment assignment
+Y <- Y0 + (Y1-Y0)*T
+
+# Create a data frame
+data1 <- data.frame(T, Y, Y1, Y0, X1)
+```
+
+The DGP is somewhat similar as the basic example with covariates (and selection bias), but now the selection implies only treatment effect heterogeneity (i.e., differences in potential outcomes under treatment $Y_i(1)$), but no selection bias (differences) in the untreated potential outcome $Y_i(0)$.
+
+## Potential outcomes
+
+The following table illustrates the potential outcomes of the treatment (going to university) on income (in thousand dollars) similar to the class example where we had conversion rates.
+
+|   | $Y_i(0)$ | $Y_i(1)$ |
+|----------------------------------|--------------------|------------------|
+| Did not go to university $T_i=0$ | `r round(mean(Y0[T==0]))` | `r round(mean(Y1[T==0]))` |
+| Went to university $T_i=1$ | `r round(mean(Y0[T==1]))` | `r round(mean(Y1[T==1]))` |
+| Total (Average) | `r round(mean(Y0))` | `r round(mean(Y1))` |
+
+Of course, in reality we will not be able to obsere both $Y_i(0)$ and $Y_i(1)$, but only $Y_i$.
+
+## Estimation
+
+Let's see what happens if we run a regression on such data.
+
+```{r}
+#| label: regression1
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model1 <- lm(Y ~ T, data = data1)
+
+# Print the summary of the regression output
+tab_model(model1)
+```
+
+```{r interpretation1, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model1)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model1)["T"]
+tau_confint <- confint(model1, "T")
+
+# Print the estimated treatment effect
+cat("The estimated treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(mean(Y1) - mean(Y0),2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(mean(Y1[T==1]) - mean(Y0[T==1]),2), "\n")
+
+# Print the 'true' ATEU
+cat("The true sample ATEU is", round(mean(Y1[T==0]) - mean(Y0[T==0]),2), "\n")
+
+# Print the observed difference in outcomes
+cat("The observed difference is", round(mean(Y1[T==1]) - mean(Y0[T==0]),2), "\n")
+
+```
+
+The regression estimate is (as always) the observed difference in realized outcomes, which in this case is a good estimate of the ATET. This is because we have no differences in untreated outcomes `Y(0)`, i.e., no selection bias, but only treatment effect heterogeneity (selection on returns).
+
+## Adding a control
+
+Controlling for X1, which is a covariate that partly explains the selection effects (here the selection on returns), gets us close to the ATE, because we are now averaging across those that are equal on X1 and thus we are averaging across the two different effects (ATET and ATEU).
+
+```{r}
+#| label: regression1b
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model1b <- lm(Y ~ T + X1, data = data1)
+
+# Print the summary of the regression output
+tab_model(model1b)
+```
+
+However, in most situations it is unlikely to have only differences in treatment effects and no selection bias. The next example shows the other situation from lecture 3 with both selection bias and treatment heterogeneity (selection on returns).
+
+# Selection bias and selection on returns (i.e, ATET $\neq$ ATEU)
+
+In this case, we are taking up the first example from lecture 3. We are specifying a situation, where we have treatment effect heterogeneity (selection on returns) and selection bias in the untreated outcomes, i.e., $E[Y_i(0)|T_i=1] \neq E[Y_i(0)|T=0]$
+
+## Data Generating Process
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r}
+#| label: data-generation2
+
+# Define the number of observations
+n <- 10000
+
+# Generate covariates
+X1 <- sample(c("Yes", "No"), size = n, replace = TRUE) # Some individual characteristic that explains why getting a university degree might be more effective (e.g., wants to work in IT)
+
+# Convert X1 to a binary indicator
+X1 <- ifelse(X1 == "Yes", 1, 0)
+
+# Generate treatment assignment
+# Treatment assignment will be dependent on X1
+# Create a linear combination of covariates to form a log-odds for T
+log_odds_T <- -3.3 + 6.5 * X1
+
+# Calculate the probability of T being 1 using the logistic function
+prob_T_1 <- 1 / (1 + exp(-log_odds_T))
+
+# Generate T as binary treatment assignment (0 or 1) based on the probabilities
+T <- rbinom(n, 1, prob_T_1)
+
+# Generate potential outcomes with covariates
+# In this case the covariate only affects the treatment outcomes
+E_y1 = 50
+E_y0 = 40
+Y1 <- E_y1 + 40*X1 + rnorm(n, mean = 0, sd = 10)
+Y0 <- E_y0 + 30*X1 + rnorm(n, mean = 0, sd = 10)
+
+# Calculate the observed outcome based on treatment assignment
+Y <- Y0 + (Y1-Y0)*T
+
+# Create a data frame
+data2 <- data.frame(T, Y, Y1, Y0, X1)
+```
+
+## Potential outcomes
+
+Again the following table illustrates the potential outcomes of income (in thousand dollars).
+
+|   | $Y_i(0)$ | $Y_i(1)$ |
+|----------------------------------|--------------------|------------------|
+| Did not go to university $T_i=0$ | `r round(mean(Y0[T==0]))` | `r round(mean(Y1[T==0]))` |
+| Went to university $T_i=1$ | `r round(mean(Y0[T==1]))` | `r round(mean(Y1[T==1]))` |
+| Total (Average) | `r round(mean(Y0))` | `r round(mean(Y1))` |
+
+Of course, in reality we will not be able to obsere both $Y_i(0)$ and $Y_i(1)$, but only $Y_i$.
+
+## Estimation
+
+```{r}
+#| label: regression2
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model2 <- lm(Y ~ T, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2)
+```
+
+```{r interpretation2, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model1)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model2)["T"]
+tau_confint <- confint(model2, "T")
+
+# Print the estimated treatment effect
+cat("The estimated treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(mean(Y1) - mean(Y0),2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(mean(Y1[T==1]) - mean(Y0[T==1]),2), "\n")
+
+# Print the 'true' ATEU
+cat("The true sample ATEU is", round(mean(Y1[T==0]) - mean(Y0[T==0]),2), "\n")
+
+# Print the observed difference in outcomes
+cat("The observed difference is", round(mean(Y1[T==1]) - mean(Y0[T==0]),2), "\n")
+
+```
+
+As we would expect, the regression estimate that captures (as always) the observed difference in realized outcomes, is neither a good estimate of the ATET nor the ATE in this case, where we have both differences in untreated outcomes `Y(0)` (i.e., selection bias) and treatment effect heterogeneity (i.e., selection on returns).
+
+## Adding a control
+
+Controlling for X1, gets us again close to the ATE. This time, we are not only averaging across the two different effects (ATET and ATEU), but it also facilitates controlling for the differences in untreated potential outcomes $Y_i(0)$, which is the selection bias (as seen previously).
+
+```{r}
+#| label: regression2b
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model2b <- lm(Y ~ T + X1, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2b)
+```
+
+```{r}
+#| label: regression2c
+#| echo: false
+#| results: 'hide'
+
+# Run a linear regression on the data to estimate the treatment effect
+model2c <- lm(Y ~ T * X1, data = data2)
+
+# Print the summary of the regression output
+tab_model(model2c)
+```
+
+# Treatment effect heterogeneity - Random assignment
+
+Now we return to randomized experiments (i.e., T is independent of the potential outcomes).
+
+We can still have treatment effect heterogeneity when we have random assignment. However, random assignment will prevent the previous selection on returns where we had ATET$\neq$ATEU because this is not possible under independence from treatment assignment (i.e., ATE = ATET = ATEU).
+
+However, as we were looking at averages, we always had heterogeneity in individual treatment effects, i.e., $Y_i(1) - Y_i(0)$. However, we mostly ignored this because we cannot get to the individual treatment effects, and we were looking at average treatment effects (i.e., ATE or ATET) for the counterfactual analysis.
+
+In this example, we want to focus on the CATE (conditional average treatment effect):
+
+$$\tau(x) = E[\tau_i|M_i=m] = E[Y_i(1)-Y_i(0)|M_i=m]$$ As we cannot directly observe the individual differences, a common way to estimate CATE is using group-specific ATEs. $$\tau(x) = = E[Y_i|T_i=1,M_i=m] - E[Y_i|T_i=0,M_i=m]$$
+
+## Data Generating Process
+
+Let us return to our example of the retailer which is testing the effectiveness of a new promotional campaign on customer purchase behavior (amount spend per month). The company randomly assigns two groups of customers to receive either the promotional offer (treatment) or no offer (control). *(see potential outcome framework.qmd)*
+
+We generate a dataset of 10 000 observations using the following data generating process:
+
+```{r}
+#| label: data-generation3
+
+# Set seed for reproducibility
+set.seed(13573)
+
+# Define the number of observations
+n <- 10000
+
+# Generate treatment assignment
+# Treatement assignment here will be random
+T <- sample(0:1, size = n, replace = TRUE)
+
+Prev_Purch <- rpois(n, lambda = 5) # Count variable, e.g., previous purchases
+Loyalty_card <- sample(c("Yes", "No"), size = n, replace = TRUE) # Nominal variable; e.g., loyalty card membership
+
+# Convert Loyalty_card to a binary indicator
+Loyalty_card <- ifelse(Loyalty_card == "Yes", 1, 0)
+
+# Note: Treatment assignment is random and thus independent of the covariates
+
+# Generate potential outcomes with covariates driving the treatment effect
+E_y0 = 80
+Y0 <- E_y0 + rnorm(n, mean = 0, sd = 10)
+
+# We write Y1 in a different way using the treatment effect directly
+tau <- 20 + Prev_Purch - 10*Loyalty_card + rnorm(n, mean = 0, sd = 10)
+Y1 <- E_y0 + tau
+
+# Calculate the observed outcome based on treatment assignment
+Y <- Y0 + (Y1-Y0)*T
+
+# Create a data frame
+data3 <- data.frame(T, Y, Y1, Y0, Prev_Purch, Loyalty_card)
+```
+
+## Potential outcomes
+
+The following table illustrates the potential outcomes (in thousand dollars)
+
+|   | $Y_i(0)$ | $Y_i(1)$ |
+|----------------------------------|--------------------|------------------|
+| Did not go to university $T_i=0$ | `r round(mean(Y0[T==0]))` | `r round(mean(Y1[T==0]))` |
+| Went to university $T_i=1$ | `r round(mean(Y0[T==1]))` | `r round(mean(Y1[T==1]))` |
+| Total (Average) | `r round(mean(Y0))` | `r round(mean(Y1))` |
+
+We can see that the potential outcomes are independent of treatment assignment.
+
+Of course, in reality we will not be able to observe both $Y_i(0)$ and $Y_i(1)$, but only $Y_i$.
+
+## Estimation
+
+```{r}
+#| label: regression3
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3 <- lm(Y ~ T, data = data3)
+
+# Print the summary of the regression output
+tab_model(model3)
+```
+
+```{r interpretation3, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model3)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model3)["T"]
+tau_confint <- confint(model3, "T")
+
+# Print the estimated treatment effect
+cat("The estimated treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' ATE
+cat("The true sample ATE is", round(mean(Y1) - mean(Y0),2), "\n")
+
+# Print the 'true' ATET
+cat("The true sample ATET is", round(mean(Y1[T==1]) - mean(Y0[T==1]),2), "\n")
+
+# Print the 'true' ATEU
+cat("The true sample ATEU is", round(mean(Y1[T==0]) - mean(Y0[T==0]),2), "\n")
+
+# Print the observed difference in outcomes
+cat("The observed difference is", round(mean(Y1[T==1]) - mean(Y0[T==0]),2), "\n")
+
+```
+
+We can see that the estimated effect is very close to the actual ATE (and ATET and ATEU).
+
+## CATE
+
+However, we now want to estimate different CATE's using groupings of the data. We can for example estimate the CATE of customers that have a loyalty card (i.e., where `Loyalty_card==1`).
+
+```{r}
+#| label: regression3b
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3b <- lm(Y ~ T, data = data3[data3$Loyalty_card == 1, ])
+
+# Print the summary of the regression output
+tab_model(model3b)
+```
+
+```{r interpretation3b, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model3b)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model3b)["T"]
+tau_confint <- confint(model3b, "T")
+
+# Print the estimated treatment effect
+cat("The estimated (conditional) treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' CATE
+cat("The true sample CATE is", round(mean(Y1[Loyalty_card==1]) - mean(Y0[Loyalty_card==1]),2), "\n")
+
+```
+
+Likewise, we can estimate the CATE of customers that do not have a loyalty card (i.e., where `Loyalty_card==0`).
+
+```{r}
+#| label: regression3c
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3c <- lm(Y ~ T, data = data3[data3$Loyalty_card == 0, ])
+
+# Print the summary of the regression output
+tab_model(model3c)
+```
+
+```{r interpretation3c, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model3c)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model3c)["T"]
+tau_confint <- confint(model3c, "T")
+
+# Print the estimated treatment effect
+cat("The estimated (conditional) treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' CATE
+cat("The true sample CATE is", round(mean(Y1[Loyalty_card==0]) - mean(Y0[Loyalty_card==0]),2), "\n")
+
+```
+
+Or we can estimate the CATE of customers that have had 4 previous purchases.
+
+```{r}
+#| label: regression3d
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3d <- lm(Y ~ T, data = data3[data3$Prev_Purch == 4, ])
+
+# Print the summary of the regression output
+tab_model(model3d)
+```
+
+```{r interpretation3d, echo=FALSE, message=FALSE}
+# Extract the regression coefficients
+coef <- summary(model3d)$coefficients
+
+# Extract the estimated treatment effect
+tau_hat <- coef(model3d)["T"]
+tau_confint <- confint(model3d, "T")
+
+# Print the estimated treatment effect
+cat("The estimated (conditional) treatment effect is", round(tau_hat, 2), "[", round(tau_confint,2), "]", "\n")
+
+# Print the 'true' CATE
+cat("The true sample CATE is", round(mean(Y1[Prev_Purch==4]) - mean(Y0[Prev_Purch==4]),2), "\n")
+
+```
+
+We can see that we can estimate subgroup specific average treatment effects (CATEs) very easily this way.
+
+The overall average treatment effects are averaging over all individuals in the population and the CATE are the sub-group specific average treatment effects.
+
+We are able to estimate these, because we have random assignment. Thus, we have observations on treated and untreated potential outcomes for all of these groups. This is an **important requirement**: overlap or common support (we have treated and untreated observations for each subgroup of the data).
+
+## Alternative way to estimate CATE
+
+While direct conditioning and group splits are an easy way to estimate a CATE, it is often not the most efficient way for understanding continuous variables. But also the estimation of categorical variables can benefit from including the estimation of heterogeneous effect directly into the regression. We do this by using interaction effects (i.e., the product of our treatment variable and the conditioning variables).
+
+```{r}
+#| label: regression3b_alternative
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3b2 <- lm(Y ~ T + T*Loyalty_card, data = data3)
+
+# Print the summary of the regression output
+tab_model(model3b2)
+
+```
+
+We can interpret the estimates that we get as follows:
+
+1)  The estimate of `T` which is `r round(coef(model3b2)["T"],2)`, is the treatment effect for customers without loyalty card (i.e., where `Loyalty_card==0`). We can see that we got the same estimate above when sub-setting the dataset.
+
+2)  The estimate of the interaction `T*Loyalty_card` is the change in this treatment effect, when customers have a loyalty card.
+
+3)  The treatment effect in the loyalty card user group is the sum of the two effects `T + T*Loyalty_card` = `r round(coef(model3b2)["T"] + coef(model3b2)["T:Loyalty_card"],2)`. We also saw this effect when sub-setting the dataset above.
+
+The interesting property of this model is that it can give you an estimate of the difference between groups through the interaction effect. Thus, you can understand whether the difference between loyalty card users and non-users is significantly different.
+
+**Important**: None of these estimated effects is the ATE. We do not get the ATE from this regression.
+
+We get the ATE when multiplying the interaction effect (conditional effect) with the average of the conditioning variable (moderator) which is `Loyalty_card`. The average of `Loyalty_card` is `r mean(Loyalty_card)`
+
+Using this value and the equation $ATE \approx \beta +\omega\ \bar{M_i}$ we get the estimated ATE as
+
+ATE = `r round(coef(model3b2)["T"] + coef(model3b2)["T:Loyalty_card"]*mean(Loyalty_card),2)`
+
+*Notes:* 
+
+- `Loyalty_card` is a 0/1 dummy variable and the average is the probability of having a loyalty card in our sample.
+
+- If the sample does not represent the distribution of the moderator in the population well (e.g., probability of 50% for loyalty card) then the estimate of the ATE is not good. Here it is ok.
+
+- Some people argue that the ATE is not very helpful in heterogeneous treatment models as it neither represents the one or the other group. However, it is what it is: an *average* applying to the total population. Thus, it is what you get when applying the treatment to the whole population. Whether this is meaningful or not is context dependent.
+
+---
+
+Likewise, we can use the continuous variable `Prev_Purch` to understand the effect of an additional purchase on the treatment effect.
+
+```{r}
+#| label: regression3d_alternative
+#| echo: true
+
+# Run a linear regression on the data to estimate the treatment effect
+model3d2 <- lm(Y ~ T + T*Prev_Purch, data = data3)
+
+# Print the summary of the regression output
+tab_model(model3d2)
+
+```
+
+We can interpret the effects as follows:
+
+1)  `T` is the treatment effect with zero previous purchases (i.e., `Prev_Purch==0`).
+
+2)  `T * Prev_Purch` is the increase in the treatment effect for each additional previous purchase.
+
+For example, for 4 previous purchases we will expect an average treatment effect of `r round(coef(model3d2)["T"] + coef(model3d2)["T:Prev_Purch"]*4,2)`, which is very similar to what we got above.
+
+Again, the nice property of this model is that it allows for a test of whether the increase in the treatment effect through previous purchases (i.e., the interaction coefficient) is significant.
+
+We can also estimate the ATE from this model using $ATE \approx \beta +\omega\ \bar{M_i}$ and the average of `Prev_Purch`
+
+ATE = `r round(coef(model3d2)["T"] + coef(model3d2)["T:Prev_Purch"]*mean(Prev_Purch),2)`
+
+---
+
+*Mean-centering*
+
+When centering the moderating variable (that is subtracting the average), the estimated effect of the treatment variable is still conditioned the moderator (here previous purchases) being zero. 
+However, the centered moderator is now zero on the sample average. Thus, the effect of the treatment variable is the conditional affect on sample average of the moderator, which is the ATE.
+
+```{r}
+#| label: regression3d_centering
+#| echo: true
+
+data3$Prev_Purch_c <- data3$Prev_Purch - mean(data3$Prev_Purch)
+
+
+# Run a linear regression on the data to estimate the treatment effect
+model3d3 <- lm(Y ~ T + T*Prev_Purch_c, data = data3)
+
+# Print the summary of the regression output
+tab_model(model3d3)
+
+```
+
+# Conclusion
+
+There are different types of treatment effect heterogeneity. We can have *selection on returns* where individuals self selected (or are selected) based on expected benefits (treatment effects). This causes differences in ATET and ATEU. In many cases, we may have additional selection bias in terms of unequal untreated potential outcomes.
+
+However, even in randomized studies we can have treatment effect heterogeneity. This time we are not selecting individuals based on their effects differences, but they may still exists. Exploring this treatment effect heterogeneity might be quite useful for theoretical and practical applications (e.g., understanding when an effect is strong vs. weak). For example, if we want to target individuals (customers) that show strong effects towards marketing activities.
+
+When we estimate regression models using interaction effects, we get conditional effects (CATE). Unless, we mean-center variables before running the regression, none of these effects represents the ATE.

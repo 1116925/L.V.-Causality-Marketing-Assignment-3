@@ -1,0 +1,662 @@
+---
+title: "Bad controls"
+author: "Jan-Michael Becker"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+---
+
+```{r}
+#| label: load necessary packages 
+#| include: false
+require(dagitty)
+
+library(foreach)
+library(doParallel)
+
+library(ggplot2)
+library(tidyr)
+```
+
+# Introduction
+
+In this document, we will discuss the concept of good and bad controls using some examples.
+I will use Monte-Carlo simulations, for which I repeatedly (1000 times) draw samples of size 500 from a data-generating process (DGP) and estimate regressions with and without the variable Z, which can be a good, bad or neutral control. 
+
+The following code block shows the simulation setup including the estimation of the samples and some summary and plotting of the results.
+
+```{r}
+#| label: Implement basic functions
+
+# Setup parallel processing
+num_cores <- detectCores() - 1  # Leave one core free
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+# Define general simulation parameters
+n <- 500        # number of observations per dataset
+nsim <- 1000    # number of simulations
+  
+# Runs parallel simulations and returns summary statistics
+run_simulation <- function(generate_data_dgp, nsim=1000, n=500) {
+  results <- foreach(i = 1:nsim, .combine = rbind) %dopar% {
+    
+    # Generate the data
+    data_df <- generate_data_dgp(n)
+    
+    # Run linear regressions
+    model_without <- lm(Y ~ W, data = data_df)
+    model_with <- lm(Y ~ W + Z, data = data_df)
+    
+    # Extract coefficients
+    c(without = coef(model_without)["W"],
+      with = coef(model_with)["W"])
+  }
+  
+  # Convert results to a data frame
+  results_df <- data.frame(results)
+  return(results_df)
+}
+
+plotHistograms_from_simulation <- function (results_df) {
+  # Reshape data for ggplot visualizations of histrograms
+  plot_data <- data.frame(
+    without = results_df$without.W,
+    with = results_df$with.W
+  ) %>%
+    gather(key = "model", value = "estimate")
+  
+  # Create histogram
+  ggplot(plot_data, aes(x = estimate, fill = model)) +
+    geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+    geom_vline(xintercept = 3, linetype = "dashed", color = "red") +
+    labs(title = "Distribution of Treatment Effect Estimates",
+         x = "Estimated Treatment Effect",
+         y = "Count",
+         fill = "Model") +
+    scale_fill_brewer(palette = "Set2",
+                      labels = c("With", "Without")) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "bottom"
+    )
+}
+```
+
+
+
+# Model 1: Confounder - Good control
+```{r}
+#| echo: false
+
+dgp1 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="1,2"]
+
+    W <- Z -> Y
+    W -> Y
+}')
+plot(dgp1)
+```
+
+```{r}
+#| label: dgp1
+
+generate_data_dgp1 <- function(n) {
+  # Generate Z as a confounder
+  Z <- rnorm(n, mean = 50, sd = 10)
+  
+  # Generate treatment depending on Z
+  W <- ifelse(Z > 50, 1, 0)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W - 0.5 * Z + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| label: Run simulation and plot results
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(123)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp1, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+
+```
+
+The true effect of W is 3. Only the model with Z is nearly unbiased in our simulation, while the model without Z is clearly biased.
+In this case, Z is a good control. In fact, it is necessary to include Z to get an unbiased treatment effect of W. 
+
+
+# Model 2: Collider - Bad control
+```{r}
+#| echo: false
+
+dgp2 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="1,2"]
+
+    W -> Z <- Y
+    W -> Y
+}')
+plot(dgp2)
+```
+
+```{r}
+#| label: dgp2
+
+generate_data_dgp2 <- function(n) {
+  # Generate (random/exogenous) treatment
+  W <- sample(0:1, size = n, replace = TRUE)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W + rnorm(n, mean = 0, sd = 2)
+  
+  # Generate Z as outcome of both W and Y
+  Z <- 30 + 15* W - 2.5* Y + rnorm(n, mean = 0, sd = 3)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(234)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp2, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+In this case, Z is clearly a bad control. The estimated treatment effect is biased if Z is included, while it is unbiased if Z is omitted. 
+This is especially important as our treatment variable W is randomly assigned (fully exogenous). Thus, we would initially expect ability to retrieve causal effects, but the bad control ruins our independence by conditioning on outcomes.
+
+# Model 3: Virtual collider - Bad control
+```{r}
+#| echo: false
+
+dgp3 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="3,2"]
+
+    Y -> Z
+    W -> Y
+}')
+plot(dgp3)
+```
+
+```{r}
+#| label: dgp3
+
+generate_data_dgp3 <- function(n) {
+  # Generate (random/exogenous) treatment
+  W <- sample(0:1, size = n, replace = TRUE)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W + rnorm(n, mean = 0, sd = 2)
+  
+  # Generate Z as outcome of Y
+  Z <- 30 - 2.5* Y + rnorm(n, mean = 0, sd = 3)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(345)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp3, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+Again, Z is clearly a bad control. The estimated treatment effect is biased if Z is included, while it is unbiased if Z is omitted. Thus, Z must not be a direct outcome of W, it can also be an indirect outcome of W through Y to be a bad control.
+
+# Model 4: Neutral control?
+```{r}
+#| echo: false
+
+dgp4 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="1,2"]
+
+    W -> Z
+    W -> Y
+}')
+plot(dgp4)
+```
+
+```{r}
+#| label: dgp4
+
+generate_data_dgp4 <- function(n) {
+  # Generate (random/exogenous) treatment
+  W <- sample(0:1, size = n, replace = TRUE)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W + rnorm(n, mean = 0, sd = 2)
+  
+  # Generate Z as outcome of W only
+  Z <- 30 + 15* W + rnorm(n, mean = 0, sd = 5)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(456)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp4, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+In this case, the inclusion of Z hurts more indirectly. It does not bias the coefficient of W; i.e., it does not affect the estimated treatment effect, but it hurts with precision (i.e., the standard error of the estimate increases). This is the typical multicollinearity problem that you may have heard about. In this case, the collinearity comes from the fact that W influences Z, but as Z is not necessary for debiasing the effect of W on Y we should not include it.
+Nevertheless, many people would consider it a neutral control because it has no consequences for the bias.
+
+
+# Model 5: Neutral control?
+```{r}
+#| echo: false
+
+dgp5 <- dagitty('dag {
+    W [pos="1,1"]
+    Y [pos="3,1"]
+    Z [pos="0,2"]
+
+    W <- Z
+    W -> Y
+}')
+plot(dgp5)
+```
+
+```{r}
+#| label: dgp5
+
+generate_data_dgp5 <- function(n) {
+  # Generate Z as independent (exogenous) variable
+  Z <- rnorm(n, mean = 50, sd = 10)
+  
+  # Generate treatment depending on Z
+  W <- ifelse(Z > 50, 1, 0)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(567)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp5, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+Same as before: Including Z does not affect the estimated treatment effect (i.e., no bias), but it increases the estimated standard error (i.e., negatively affects precision of the estimate).
+
+
+# Model 6: Neutral control?
+```{r}
+#| echo: false
+
+dgp6 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="1,2"]
+
+    W -> Y <- Z
+}')
+plot(dgp6)
+```
+
+```{r}
+#| label: dgp6
+
+generate_data_dgp6 <- function(n) {
+  # Generate (random/exogenous) treatment
+  W <- sample(0:1, size = n, replace = TRUE)
+  
+  # Generate Z as independent (exogenous) variable
+  Z <- rnorm(n, mean = 50, sd = 10)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W - 0.5 * Z + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(678)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp6, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+In this case, including Z does not help or hurt the estimated treatment effect (i.e., no bias), but it clearly helps with precision (i.e., estimated standard errors are smaller).
+
+
+# Model 7: M-Bias - Bad control
+```{r}
+#| echo: false
+
+dgp7 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="4,1"]
+    Z [pos="2,0.5"]
+    V [pos="1,0"]
+    U [pos="3,0"]
+
+    V -> W -> Y
+    V -> Z <- U
+    U -> Y
+}')
+plot(dgp7)
+```
+
+```{r}
+#| label: dgp7
+
+generate_data_dgp7 <- function(n) {
+  # Generate U and V as independent (exogenous) variables
+  # Note: U and V are unobserved and will not be available in the data
+  U <- rnorm(n, mean = 50, sd = 5)
+  V <- rnorm(n, mean = 50, sd = 5)
+  
+  # Generate Z depending on both U and V
+  Z <- U + V + rnorm(n, mean = 50, sd = 3)
+  
+  # Generate treatment depending on V
+  W <- ifelse(V > 50, 1, 0)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W - 0.5 * U + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(789)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp7, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+We can see that the model with Z is biased and the model without Z is unbiased. Thus, Z is a bad control.
+
+
+# Model 8: Bad control
+```{r}
+#| echo: false
+
+dgp8 <- dagitty('dag {
+    W [pos="0,1"]
+    Y [pos="2,1"]
+    Z [pos="1,2"]
+    U [pos="3,2"]
+
+    W -> Y <- U
+    W -> Z <- U
+}')
+plot(dgp8)
+```
+
+```{r}
+#| label: dgp8
+
+generate_data_dgp8 <- function(n) {
+  # Generate U and V as independent (exogenous) variables
+  # Note: U is unobserved and will not be available in the data
+  U <- rnorm(n, mean = 50, sd = 5)
+
+  # Generate (random/exogenous) treatment
+  W <- sample(0:1, size = n, replace = TRUE)
+  
+  # Generate Z depending on both U and W
+  Z <- W + U + rnorm(n, mean = 50, sd = 3)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W - 0.5 * U + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(890)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp8, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+Model 8 is an extension of model 4, where Z turns into a bad control because an unobserved confounder U affects both Z and Y. 
+In model 4, Z was "only" reducing the precision of the estimate when included in the regression (increasing the standard error), but through the unobserved confounder U it became a clearly bad control inducing bias. Therefore, some try to avoid all outcomes of W as control variables.
+
+
+# Model 9: Bad control
+```{r}
+#| echo: false
+
+dgp9 <- dagitty('dag {
+    W [pos="1,1"]
+    Y [pos="3,1"]
+    Z [pos="0,2"]
+    U [pos="2,2"]
+
+    Z -> W <- U
+    W -> Y <- U
+}')
+plot(dgp9)
+```
+
+```{r}
+#| label: dgp9
+
+generate_data_dgp9 <- function(n) {
+  # Generate U and V as independent (exogenous) variables
+  # Note: U is unobserved and will not be available in the data
+  U <- rnorm(n, mean = 50, sd = 5)
+  
+  # Generate Z as independent (exogenous) variable
+  Z <- rnorm(n, mean = 50, sd = 5)
+  
+  # Generate treatment depending on Z
+  W <- ifelse(Z+U > 100, 1, 0)
+  
+  # Generate observed outcome Y
+  Y <- 20 + 3*W - 0.5 * U + rnorm(n, mean = 0, sd = 2)
+  
+  # Return as data frame
+  data.frame(Y = Y, W = W, Z = Z)
+}
+```
+
+```{r}
+#| echo: false
+
+# Set seed for reproducibility
+set.seed(901)
+
+results_df <- run_simulation(generate_data_dgp = generate_data_dgp9, nsim = nsim, n = n)
+
+# Calculate summary statistics
+summary_stats <- data.frame(
+  Model = c("Without", "With"),
+  Mean_Estimate = c(mean(results_df$without.W), 
+                   mean(results_df$with.W)),
+  SD_Estimate = c(sd(results_df$without.W), 
+                  sd(results_df$with.W))
+)
+  
+# Print summary statistics
+print(summary_stats)
+
+plotHistograms_from_simulation(results_df)
+```
+
+Model 9 is an extension of model 5, where Z again turns into a bad control because of an unobserved confounder U. However, this time the confounder does not even affect Z but only W and Y.
+In model 5, Z was "only" reducing the precision of the estimate when included in the regression (increasing the standard error), but through the unobserved confounder U it became a clearly bad control because it amplifies the bias induced by U; i.e., the effect of W is already biased by U and controlling for Z makes the bias worse and not better.
+
+
+# Conclusion
+
+Including Z as a covariate/control variable only helps if Z is a confounder (i.e., a common cause of both W and Y) or another independent cause of Y. In the first case, it reduces the bias and in the second case it improves precision (there is no bias to correct).
+
+It usually hurts, if Z is an outcome of W or Y (i.e., a post-treatment variable).
+It can hurt by inducing bias (i.e, changes the estimated treatment effect) or it can (only) hurt in terms of precision (i.e., increasing the standard error of the estimate).
+There are only very few exceptions to this rule. Cinelli, Forney, & Pearl (2022) describe a situation with sample selection bias in which including a post-treatment Z as in our model 4 can reduce bias.
+
+A special situation happens if Z is an antecedent/parent of W. In this case, conditioning on Z (i.e., controlling for Z) usually hurts in terms of precision (i.e., increasing the standard error of the estimate), but it may also amplify bias through unobserved confounders (model 9).
+From model 7 and 9, we can see that not all pre-treatment variables are good controls as some authors suggest.
+
+
+```{r}
+#| echo: false
+
+# Stop cluster
+stopCluster(cl)
+```
