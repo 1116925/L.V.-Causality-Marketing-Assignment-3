@@ -1,5 +1,5 @@
 ---
-title: "L.V. Causality Marketing Assignment 2"
+title: "L.V. Causality Marketing Assignment 3"
 date: "`r Sys.Date()`"
 format: 
   html:
@@ -49,26 +49,22 @@ model_adj <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
 summary(model_adj)
 ```
 
-## Specifically extract the ATE value
+Extract the ATE value from the regression and calculate robust standard errors using the HC3 estimator, which is more reliable in small samples and with heteroskedasticity.
 ```{r}
+coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
 ate <- coef(model_adj)["d"]
 cat("The estimated Average Treatment Effect (ATE) for the treatment is:", ate, "\n")
-```
-
-```{r}
-# Optional: robust SE
-coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
 ```
 
 # Matching comparisons
 Preparing the data for matching excersises
 ```{r}
-ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
+ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + 
+X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
 ```
 
 ## 1:1 Nearest Neighbor Matching WITHOUT Replacement
 ```{r}
-cat("\n--- Matching: 1:1 Without Replacement ---\n")
 match_no_replace <- matchit(ps_formula, 
                             data = casedata_task3, 
                             method = "nearest", 
@@ -85,23 +81,24 @@ data_matched_no_replace <- match.data(match_no_replace)
 
 # Estimate the Treatment Effect
 # We include the covariates in the final outcome model to make it "doubly robust"
-model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
+                       X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
                        data = data_matched_no_replace, 
                        weights = weights)
-
-# Calculate robust standard errors
-cat("\nTreatment Effect (Without Replacement):\n")
-print(coeftest(model_no_replace, vcov. = vcovHC))
 ```
 
+Extract the ATT value and calculate robust standard errors using Variance/Covariance Heteroscedasticity-Consistent matrix estimation, which is used to adjust the standard errors of the estimated treatment effects to account for the matched data structure and potential heteroscedasticity.
 ```{r}
+# Calculate robust standard errors
+print(coeftest(model_no_replace, vcov. = vcovHC))
 att <- coef(model_no_replace)["d"]
 cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
 ```
 
 ## 1:1 Nearest Neighbor Matching WITH Replacement
+<!-- Use get_matches() instead of match.data() when matching WITH replacement 
+to properly duplicate rows that are used as matches multiple times. -->
 ```{r}
-cat("\n--- Matching: 1:1 With Replacement ---\n")
 match_with_replace <- matchit(ps_formula, 
                               data = casedata_task3, 
                               method = "nearest", 
@@ -114,28 +111,21 @@ cat("Balance Summary (With Replacement):\n")
 print(summary(match_with_replace, un = FALSE))
 
 # Extract the matched dataset
-# Use get_matches() instead of match.data() when matching WITH replacement 
-# to properly duplicate rows that are used as matches multiple times.
 data_matched_with_replace <- get_matches(match_with_replace)
 
 # Estimate the Treatment Effect
-model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
+                         X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
                          data = data_matched_with_replace, 
                          weights = weights)
-
-# For matching WITH replacement, individuals can be matched multiple times. 
-# Therefore, standard errors must be clustered by the matched pair ID (`subclass`).
-cat("\nTreatment Effect (With Replacement):\n")
-print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
 ```
 
+Extract the ATT value and calculate robust standard errors clustered by the matched pair ID (`subclass`), which accounts for the fact that some control units may be used multiple times as matches, leading to correlated errors within matched pairs.
 ```{r}
+print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
 att <- coef(model_with_replace)["d"]
 cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
 ```
-
-
-
 
 ## Euclidean Distance Matching
 ```{r}
@@ -152,18 +142,20 @@ summary(euc_out)
 # bal.tab(euc_out) - balance info already shown in summary above
 
 m_data_euc <- match.data(euc_out)
-lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + 
+             X15 + X16 + X17 + X18 + X19 + X20, 
              data = m_data_euc, weights = weights)
+```
 
-cat("\nTreatment Effect (Euclidean Matching):\n")
+Extract the ATT value and calculate robust standard errors using the HC3 estimator
+```{r}
 summary(lm_euc)
 
 cat("\nRobust Standard Errors (Euclidean Matching):\n")
 print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
 ```
 
-
-## Inverse Probability Weighting (IPW)
+# Inverse Probability Weighting (IPW)
 ```{r}
 # Complete-case sample for IPW variables
 ipw_vars <- c("y", "d", paste0("X", 1:20))
@@ -252,12 +244,12 @@ print(summary(lm_ipw))
 print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3")))
 ```
 
-### IPW Critical Discussion Points
+## IPW Critical Discussion Points
 - Overlap/common support: if many propensity scores are near 0 or 1, inverse weights become extreme and the estimator becomes unstable with high variance.
 - Weighting logic: IPW up-weights observations with treatment status that is unlikely given their covariates, creating a pseudo-population with improved covariate balance.
 - Efficiency: IPW is unbiased under conditional independence and overlap, but often has higher variance than AIPW.
 
-## Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
+# Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
 This section implements AIPW manually using the doubly robust score:
 
 $$
@@ -266,12 +258,6 @@ ATE = \frac{1}{N}\sum_{i=1}^{N} \left( \frac{T_i}{\hat{p}(X_i)}(Y_i - \hat{\mu}_
 $$
 
 ```{r}
-# User-requested structure:
-# df            : data frame
-# treatment     : binary treatment indicator (0/1)
-# sales         : numeric outcome
-# covariates    : character vector with covariate names
-
 df <- casedata_task3
 df$treatment <- df$d
 df$sales <- df$y
@@ -346,7 +332,7 @@ cat("Bootstrap SE (AIPW):", round(aipw_se, 4), "\n")
 cat("95% Bootstrap CI (AIPW): [", round(aipw_ci[1], 4), ",", round(aipw_ci[2], 4), "]\n")
 ```
 
-### AIPW Critical Discussion Points
+## AIPW Critical Discussion Points
 - Doubly robust consistency: AIPW is consistent if either the propensity score model or the outcome regression models are correctly specified.
 - Efficiency: Compared with simple IPW, AIPW is typically more stable and can achieve the semiparametric efficiency bound under correct specification.
 - Debiasing logic: The residual-weighted terms, $(Y - \hat{\mu})$, correct the regression predictions using inverse-probability weighting.
@@ -446,7 +432,7 @@ run_dml_spec <- function(spec_name, regr_id, classif_id,
 # Three requested learner families
 dml_lasso <- run_dml_spec(
   spec_name = "Lasso",
-  regr_id = "regr.lasso",
+  regr_id = "regr.glmnet",
   classif_id = "classif.lasso",
   regr_fallback = "regr.cv_glmnet",
   classif_fallback = "classif.cv_glmnet"
@@ -490,7 +476,7 @@ cat("\nBest-fitting nuisance combination (lower RMSE + LogLoss):",
     dml_results$Model[best_idx], "\n")
 ```
 
-### DML Discussion Points
+## DML Discussion Points
 - DML solves regularization bias and overfitting bias: sample splitting and cross-fitting reduce overfitting from flexible learners.
 - Predictive performance of nuisance models is central: lower RMSE/log-loss means cleaner residualization (orthogonalization) for treatment-effect estimation.
 - Compared with weighting estimators, PLR-style partialling out avoids direct division by propensity scores, which can be more stable under weak overlap.
@@ -632,3 +618,45 @@ print(comparison_table, row.names = FALSE)
 cat("\nNote: ATT rows are matching estimands; all other rows report ATE.\n")
 cat("DML rows include learner-specific PLR estimates with 5-fold cross-fitting and orthogonal-score inference.\n")
 ```
+
+# Discussion
+
+## 1. Comparison of ATE vs. ATT Estimates
+A fundamental distinction in these findings is the estimand being measured.
+
+* **Average Treatment Effect (ATE):** Regression Adjustment, IPW, AIPW, and Double ML all target the ATE, which is the average effect of the discount if it were applied to the entire population. These estimates (excluding the unstable manual IPW) range from approximately **13.70 to 18.85**.
+* **Average Treatment Effect on the Treated (ATT):** Matching methods estimate the ATT, focusing on the effect specifically for those who actually received the discount. The ATT estimates are generally higher, ranging from **16.16 to 23.25**.
+
+> **Key Finding:** The fact that the **ATT (23.25 for 1:1 with replacement)** is substantially higher than the **ATE (15.15 for Regression Adjustment)** suggests **Selection on Returns**. This indicates that the customers who were selected (or selected themselves) to receive the discount responded more strongly to it than the "average" customer in the dataset would have.
+
+---
+
+## 2. Methodological Divergence and Instability
+
+* **The IPW Outlier:** The manual IPW formula yielded an extreme and non-sensical estimate of **-318.12**. This highlights a core issue with standard IPW: it is highly sensitive to propensity scores close to zero or one, which causes weights to explode, leading to massive variance and unstable estimates. The "IPW Weighted Regression (Secondary)" estimate of **15.81** is much more aligned with other methods, likely due to internal stabilization or normalization of weights.
+* **Matching Variability:** Matching with replacement (**23.25**) differs significantly from matching without replacement (**17.15**). Matching with replacement generally reduces bias by ensuring treated units are matched to the most similar control units, even if those control units are used multiple times, though it can increase variance.
+
+---
+
+## 3. The Role of Double Robustness and Machine Learning
+
+* **AIPW (18.85):** This estimator is "doubly robust," meaning it remains consistent if either the outcome model (regression) or the selection model (propensity score) is correctly specified. It typically achieves a semiparametric efficiency bound, providing lower asymptotic variance than standard IPW.
+* **Double ML (DML):** DML uses flexible ML algorithms to "partial out" or residualize the influence of the 20 covariates.
+    * **DML-PLR (XGBoost):** 18.35
+    * **DML-PLR (Lasso):** 15.23
+    * **DML-PLR (Random Forest):** 13.70
+
+**Observation:** The variation among these shows that the choice of ML algorithm impacts the estimate. XGBoost and AIPW are closely aligned (~18), suggesting they are capturing similar non-linearities in the selection and outcome processes that OLS (15.15) might miss.
+
+---
+
+## 4. Conclusion: Which Estimate to Trust?
+The **AIPW** or **Double ML (specifically XGBoost or Lasso)** estimates are generally the most trustworthy for the following reasons:
+
+1.  **Reduction of Model Dependence:** Unlike simple Regression Adjustment, which assumes a strictly linear functional form, DML and AIPW allow for complex, non-linear relationships between the 20 covariates and sales.
+2.  **Double Robustness:** AIPW provides two "chances" to get the model right, making it more robust to misspecification of either the treatment assignment or the outcome.
+3.  **Stability:** While matching is excellent for reducing model dependence, it often requires discarding units that lack "Common Support," which can change the quantity of interest. AIPW and DML utilize more of the data while maintaining theoretical rigor.
+
+### Final Recommendation
+* **Goal: Average Customer Effect** $\rightarrow$ Prioritize the **AIPW estimate (18.85)** or **DML-XGBoost (18.35)**.
+* **Goal: Currently Targeted Customers** $\rightarrow$ The **Matching ATT (approx. 23.25)** is more relevant, provided high covariate balance was achieved.
