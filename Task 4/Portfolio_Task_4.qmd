@@ -1,0 +1,318 @@
+---
+title: "GRA4158 Marketing - Analysis of Experiments, Portfolio 4"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+warning: false
+author: Vilijam Cekov, Luiz Felipe De Souza Simao
+---
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(synthdid)
+library(dplyr)
+library(readr)
+library(plm)
+library(lmtest)
+library(knitr)
+```
+
+# Import Data
+```{r}
+#| label: Importing and processing the data
+df <- read_delim("Store_data_2026_taks4.csv", delim = ";")
+
+# Create necessary dummy variables
+df <- df %>%
+  mutate(
+    # 'post_treatment' is 1 for the weeks after the marketing strategy started
+    post_treatment = ifelse(Weekind >= 78, 1, 0),
+    # 'treated' is the actual interaction / DiD term (1 ONLY for Store 109 AND Weekind >= 78)
+    treated = ifelse(storeNum == 109 & Weekind >= 78, 1, 0)
+  )
+
+# Display the structure of the data to verify column names
+str(df)
+
+# Check the first few rows
+head(df)
+```
+<!-- # Use only treatment + appropriate pre-treatment covariates -->
+
+# A simple pre-post analysis of only the treated store for each product controlling for relevant covariates
+The relevant covariates chosen are price and promotion for each product, as they are likely to influence sales. Time-invariant covariates such as store size and city size are excluded from this analysis since we are only looking at one store (Store 109) and they do not vary over time.
+
+```{r}
+#| label: pre-post analysis
+# Filter data to only include Store 109
+df_109 <- df %>% filter(storeNum == 109)
+
+# --- Product 1: Pre-Post Model ---
+pre_post_p1 <- lm(p1sales ~ post_treatment + p1price + p1prom, data = df_109)
+summary(pre_post_p1)
+
+# --- Product 2: Pre-Post Model ---
+pre_post_p2 <- lm(p2sales ~ post_treatment + p2price + p2prom, data = df_109)
+summary(pre_post_p2)
+
+```
+
+# A simple two-way fixed-effect panel model for each product controlling for relevant covariates
+Store fixed effects will automatically absorb (control for) all time-invariant store characteristics (like storesize and city). Time fixed effects will absorb aggregate shocks that affect all stores in a given week. Therefor no particular changed will be made to the data, as the plm package will handle this automatically when we specify the model.
+
+```{r}
+#| label: two-way fixed effects analysis
+pdf <- pdata.frame(df, index = c("storeNum", "Weekind"))
+
+# --- Product 1: TWFE Model ---
+twfe_p1 <- plm(p1sales ~ treated + p1price + p1prom, 
+               data = pdf, 
+               model = "within", 
+               effect = "twoways")
+summary(twfe_p1)
+
+# --- Product 2: TWFE Model ---
+twfe_p2 <- plm(p2sales ~ treated + p2price + p2prom, 
+               data = pdf, 
+               model = "within", 
+               effect = "twoways")
+summary(twfe_p2)
+```
+
+Correcting for autocorrelation and heteroskedasticity
+
+```{r}
+#| label: Extracting Robust Standard Errors for TWFE
+# --- Product 1 TWFE with Clustered Standard Errors ---
+coeftest(twfe_p1, vcov = vcovHC(twfe_p1, type = "HC1", cluster = "group"))
+
+# --- Product 2 TWFE with Clustered Standard Errors ---
+coeftest(twfe_p2, vcov = vcovHC(twfe_p2, type = "HC1", cluster = "group"))
+```
+
+# Simple DiD, SC, and SDID analyses for each product
+### Product 1: p1sales
+```{r}
+#| label: DiD, SC, and SDID analyses for Product 1
+
+# Ensure data frame is standard class (synthdid prefers plain data.frames over tibbles)
+df <- as.data.frame(df)
+
+# Setup panel matrices for Product 1
+setup_p1 <- panel.matrices(
+  df,
+  unit = "storeNum",
+  time = "Weekind",
+  outcome = "p1sales",
+  treatment = "treated"
+)
+
+# Estimate the treatment effects for Product 1
+sdid_est_p1 <- synthdid_estimate(setup_p1$Y, setup_p1$N0, setup_p1$T0)
+did_est_p1 <- did_estimate(setup_p1$Y, setup_p1$N0, setup_p1$T0)
+sc_est_p1 <- sc_estimate(setup_p1$Y, setup_p1$N0, setup_p1$T0)
+estimates_p1 = list(did_est_p1, sc_est_p1, sdid_est_p1)
+
+# Print the estimates
+names(estimates_p1) = c('Diff-in-Diff', 'Synthetic Control', 'Synthetic Diff-in-Diff')
+print(unlist(estimates_p1))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
+se_p1 <- sqrt(vcov(sdid_est_p1, method = "placebo"))
+cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p1 - 1.96 * se_p1, sdid_est_p1 + 1.96 * se_p1))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for DID
+se_p1 <- sqrt(vcov(did_est_p1, method = "placebo"))
+cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p1 - 1.96 * se_p1, did_est_p1 + 1.96 * se_p1))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for SC
+se_p1 <- sqrt(vcov(sc_est_p1, method = "placebo"))
+cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p1 - 1.96 * se_p1, sc_est_p1 + 1.96 * se_p1))
+
+# Plot 1: Trends of treated vs. synthetic control
+synthdid_plot(estimates_p1, facet.vertical = FALSE)
+# Plot 2: See which control stores received the highest weights
+synthdid_units_plot(estimates_p1)
+```
+
+### Product 2: p2sales
+The same steps as for Product 1 are repeated for Product 2.
+```{r}
+#| label: DiD, SC, and SDID analyses for Product 2
+# Setup panel matrices for Product 2
+setup_p2 <- panel.matrices(
+  df,
+  unit = "storeNum",
+  time = "Weekind",
+  outcome = "p2sales",
+  treatment = "treated"
+)
+
+# Estimate the treatment effects for Product 2
+sdid_est_p2 <- synthdid_estimate(setup_p2$Y, setup_p2$N0, setup_p2$T0)
+did_est_p2 <- did_estimate(setup_p2$Y, setup_p2$N0, setup_p2$T0)
+sc_est_p2 <- sc_estimate(setup_p2$Y, setup_p2$N0, setup_p2$T0)
+estimates_p2 = list(did_est_p2, sc_est_p2, sdid_est_p2)
+
+# Print the estimates
+names(estimates_p2) = c('Diff-in-Diff', 'Synthetic Control', 'Synthetic Diff-in-Diff')
+print(unlist(estimates_p2))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
+se_p2 <- sqrt(vcov(sdid_est_p2, method = "placebo"))
+cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p2 - 1.96 * se_p2, sdid_est_p2 + 1.96 * se_p2))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for DID
+se_p2 <- sqrt(vcov(did_est_p2, method = "placebo"))
+cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p2 - 1.96 * se_p2, did_est_p2 + 1.96 * se_p2))
+
+# Calculate standard errors and 95% Confidence Intervals using placebo method for SC
+se_p2 <- sqrt(vcov(sc_est_p2, method = "placebo"))
+cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p2 - 1.96 * se_p2, sc_est_p2 + 1.96 * se_p2))
+
+# Plot 1: Trends of treated vs. synthetic control
+synthdid_plot(estimates_p2, facet.vertical = FALSE)
+# Plot 2: See which control stores received the highest weights
+synthdid_units_plot(estimates_p2)
+```
+
+## Regressing out the covariates
+Given that the base synthdid package used does not easily accept additional control variables (like price and promotions) directly into its primary matrix setup, we can implement a solution based on the Frisch-Waugh-Lovell (FWL) theorem: we first use a linear regression to predict sales based only on the covariates, extract the residuals (the portion of sales unexplained by price, promotions, etc.), and then apply the SDID model to those residuals.
+
+By adding the overall mean back to the residuals, we keep the interpretation on the same scale as the original sales volume.
+
+### Product 1: p1sales
+```{r}
+#| label: Regressing out covariates for Product 1
+
+# Run a linear model and extract the residuals (unexplained sales)
+model_p1 <- lm(p1sales ~ p1price + p1prom + compind + storesize + citysize, data = df)
+df$p1sales_adj <- residuals(model_p1) + mean(df$p1sales, na.rm = TRUE)
+
+# Setup panel matrices using the NEW adjusted outcome variable
+setup_p1_adj <- panel.matrices(
+  df,
+  unit = "storeNum",
+  time = "Weekind",
+  outcome = "p1sales_adj", 
+  treatment = "treated"
+)
+
+# Estimate the adjusted SDID Treatment Effect
+sdid_est_p1_adj <- synthdid_estimate(setup_p1_adj$Y, setup_p1_adj$N0, setup_p1_adj$T0)
+print(sdid_est_p1_adj)
+
+# Calculate and print confidence intervals for Product 1
+se_p1_adj <- sqrt(vcov(sdid_est_p1_adj, method = "placebo"))
+cat(sprintf("Adjusted 95%% CI: [%.2f, %.2f]\n\n", 
+            sdid_est_p1_adj - 1.96 * se_p1_adj, 
+            sdid_est_p1_adj + 1.96 * se_p1_adj))
+
+# Visualize adjusted trends
+plot(sdid_est_p1_adj)+theme_minimal()
+```
+
+### Product 2: p2sales
+
+```{r}
+#| label: Regressing out covariates for Product 2
+
+# Run a linear model and extract the residuals (unexplained sales)
+model_p2 <- lm(p2sales ~ p2price + p2prom + compind + storesize + citysize, data = df)
+df$p2sales_adj <- residuals(model_p2) + mean(df$p2sales, na.rm = TRUE)
+
+# Setup panel matrices using the NEW adjusted outcome variable
+setup_p2_adj <- panel.matrices(
+  df,
+  unit = "storeNum",
+  time = "Weekind",
+  outcome = "p2sales_adj", 
+  treatment = "treated"
+)
+
+# Estimate the adjusted SDID Treatment Effect
+sdid_est_p2_adj <- synthdid_estimate(setup_p2_adj$Y, setup_p2_adj$N0, setup_p2_adj$T0)
+print(sdid_est_p2_adj)
+
+# Calculate and print confidence intervals for Product 2
+se_p2_adj <- sqrt(vcov(sdid_est_p2_adj, method = "placebo"))
+cat(sprintf("Adjusted 95%% CI: [%.2f, %.2f]\n\n", 
+            sdid_est_p2_adj - 1.96 * se_p2_adj, 
+            sdid_est_p2_adj + 1.96 * se_p2_adj))
+
+# Visualize adjusted trends
+plot(sdid_est_p2_adj)+theme_minimal()
+```
+
+# Summary of Findings
+
+```{r}
+#| label: compile-results-table
+#| echo: false
+#| message: false
+
+# 1. Extract robust standard errors from the TWFE models
+# (We run coeftest again here to easily extract the values)
+robust_twfe_p1 <- coeftest(twfe_p1, vcov = vcovHC(twfe_p1, type = "HC1", cluster = "group"))
+robust_twfe_p2 <- coeftest(twfe_p2, vcov = vcovHC(twfe_p2, type = "HC1", cluster = "group"))
+
+# 2. Create a consolidated data frame with Estimates and Standard Errors (SE)
+results_summary <- data.frame(
+  Model = c(
+    "Pre-Post (LM)", 
+    "Two-Way Fixed Effects (TWFE)", 
+    "Difference-in-Differences (DID)", 
+    "Synthetic Control (SC)", 
+    "Synthetic DID (SDID)", 
+    "Adjusted SDID (with Covariates)"
+  ),
+  
+  # Product 1 Estimates and Standard Errors
+  P1_Estimate = c(
+    coef(pre_post_p1)["post_treatment"],
+    robust_twfe_p1["treated", "Estimate"],
+    as.numeric(did_est_p1),
+    as.numeric(sc_est_p1),
+    as.numeric(sdid_est_p1),
+    as.numeric(sdid_est_p1_adj)
+  ),
+  P1_SE = c(
+    summary(pre_post_p1)$coefficients["post_treatment", "Std. Error"],
+    robust_twfe_p1["treated", "Std. Error"],
+    as.numeric(sqrt(vcov(did_est_p1, method = "placebo"))),
+    as.numeric(sqrt(vcov(sc_est_p1, method = "placebo"))),
+    as.numeric(sqrt(vcov(sdid_est_p1, method = "placebo"))),
+    as.numeric(sqrt(vcov(sdid_est_p1_adj, method = "placebo")))
+  ),
+  
+  # Product 2 Estimates and Standard Errors
+  P2_Estimate = c(
+    coef(pre_post_p2)["post_treatment"],
+    robust_twfe_p2["treated", "Estimate"],
+    as.numeric(did_est_p2),
+    as.numeric(sc_est_p2),
+    as.numeric(sdid_est_p2),
+    as.numeric(sdid_est_p2_adj)
+  ),
+  P2_SE = c(
+    summary(pre_post_p2)$coefficients["post_treatment", "Std. Error"],
+    robust_twfe_p2["treated", "Std. Error"],
+    as.numeric(sqrt(vcov(did_est_p2, method = "placebo"))),
+    as.numeric(sqrt(vcov(sc_est_p2, method = "placebo"))),
+    as.numeric(sqrt(vcov(sdid_est_p2, method = "placebo"))),
+    as.numeric(sqrt(vcov(sdid_est_p2_adj, method = "placebo")))
+  )
+)
+
+# 3. Generate the HTML table
+kable(
+  results_summary, 
+  digits = 2, 
+  col.names = c("Model", "P1 Estimate", "P1 SE", "P2 Estimate", "P2 SE"),
+  caption = "Comparison of Treatment Effect Estimates for Product 1 and Product 2",
+  align = "lcccc"
+)
+```

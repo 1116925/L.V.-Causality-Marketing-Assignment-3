@@ -1,0 +1,692 @@
+---
+title: "GRA4158 Marketing - Analysis of Experiments, Portfolio 3"
+format: 
+  html:
+    embed-resources: true
+    self-contained-math: true
+toc: true
+author: Vilijam Cekov, Luiz Felipe De Souza Simao
+---
+```{r}
+#| label: load necessary packages
+#| include: false
+
+library(sjPlot)
+library(kableExtra)
+library(ggplot2)
+library(AER)
+library(MatchIt)
+library(sandwich)
+library(lmtest)
+library(DoubleML)
+library(mlr3)
+library(mlr3learners)
+library(glmnet)
+library(ranger)
+library(xgboost)
+```
+
+# Import Data
+```{r}
+casedata_task3 <- read.csv("CaseData_Task3.csv", stringsAsFactors = FALSE)
+
+# Display the structure of the data to verify column names
+str(casedata_task3)
+
+# Check the first few rows
+head(casedata_task3)
+```
+<!-- # Use only treatment + appropriate pre-treatment covariates -->
+
+# Estimate the treatment effect using simple linear Regression Adjustment
+The estimate for the discount coefficient is the Regression Adjustment ATE
+```{r}
+model_adj <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+                 X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+                 data = casedata_task3)
+
+summary(model_adj)
+```
+
+Extract the ATE value from the regression and calculate robust standard errors using the HC3 estimator, which is more reliable in small samples and with heteroskedasticity.
+```{r}
+coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
+ate <- coef(model_adj)["d"]
+cat("The estimated Average Treatment Effect (ATE) for the treatment is:", ate, "\n")
+```
+
+# Matching comparisons
+Preparing the data for matching excersises
+```{r}
+ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + 
+X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
+```
+
+## 1:1 Nearest Neighbor Matching WITHOUT Replacement
+```{r}
+match_no_replace <- matchit(ps_formula, 
+                            data = casedata_task3, 
+                            method = "nearest", 
+                            distance = "glm",   # Uses logistic regression for propensity scores
+                            replace = FALSE,    # Without replacement
+                            ratio = 1)          # 1:1 matching
+
+# View a summary to check covariate balance (ideally Std. Mean Diff < 0.1)
+cat("Balance Summary (Without Replacement):\n")
+print(summary(match_no_replace, un = FALSE))
+
+# Extract the matched dataset
+data_matched_no_replace <- match.data(match_no_replace)
+
+# Estimate the Treatment Effect
+# We include the covariates in the final outcome model to make it "doubly robust"
+model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
+                       X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+                       data = data_matched_no_replace, 
+                       weights = weights)
+```
+
+Looking at the balance table, the results are not great. Many covariates still have SMDs well above 0.1 -- X12 is at −1.54, X11 at −0.83, X13 at −0.93. The propensity score distance SMD is 1.92, which is quite high. So even after matching, the treated and control groups still look pretty different on these variables. We think this happens because without replacement, once a good control unit gets matched it's gone, and later treated units get stuck with worse matches. This makes us less confident in the ATT from this specification.
+
+Extract the ATT value and calculate robust standard errors using Variance/Covariance Heteroscedasticity-Consistent matrix estimation, which is used to adjust the standard errors of the estimated treatment effects to account for the matched data structure and potential heteroscedasticity.
+```{r}
+# Calculate robust standard errors
+print(coeftest(model_no_replace, vcov. = vcovHC))
+att <- coef(model_no_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+## 1:1 Nearest Neighbor Matching WITH Replacement
+<!-- Use get_matches() instead of match.data() when matching WITH replacement 
+to properly duplicate rows that are used as matches multiple times. -->
+```{r}
+match_with_replace <- matchit(ps_formula, 
+                              data = casedata_task3, 
+                              method = "nearest", 
+                              distance = "glm",
+                              replace = TRUE,     # With replacement
+                              ratio = 1)
+
+# View a summary to check covariate balance
+cat("Balance Summary (With Replacement):\n")
+print(summary(match_with_replace, un = FALSE))
+
+# Extract the matched dataset
+data_matched_with_replace <- get_matches(match_with_replace)
+
+# Estimate the Treatment Effect
+model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
+                         X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+                         data = data_matched_with_replace, 
+                         weights = weights)
+```
+
+Balance is much better here. Most SMDs drop below 0.13, and the propensity score distance SMD is basically 0 (0.0005). X7 and X8 are still a bit above 0.1 (~0.22–0.24), but overall this is a big improvement over the without-replacement version. This makes sense -- allowing replacement means each treated unit can grab the best available control, even if that control has already been used. The downside is that some controls get reused a lot, which is why we need to cluster the standard errors by subclass below.
+
+Extract the ATT value and calculate robust standard errors clustered by the matched pair ID (`subclass`), which accounts for the fact that some control units may be used multiple times as matches, leading to correlated errors within matched pairs.
+```{r}
+print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
+att <- coef(model_with_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+## Euclidean Distance Matching
+```{r}
+euc_out <- matchit(
+  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+       X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+  data = casedata_task3,
+  method = "nearest",
+  distance = "euclidean",
+  normalize = TRUE
+)
+
+summary(euc_out)
+# bal.tab(euc_out) - balance info already shown in summary above
+
+m_data_euc <- match.data(euc_out)
+lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + 
+             X15 + X16 + X17 + X18 + X19 + X20, 
+             data = m_data_euc, weights = weights)
+```
+
+Extract the ATT value and calculate robust standard errors using the HC3 estimator
+```{r}
+summary(lm_euc)
+
+cat("\nRobust Standard Errors (Euclidean Matching):\n")
+print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
+```
+
+### Comparing matching quality across methods
+Looking at the balance tables side by side, Euclidean distance matching and PSM without replacement perform similarly -- and both are pretty bad. The Euclidean SMDs are actually slightly worse on the key problem covariates (X12 = −1.60 vs. −1.54 for PSM, X11 = −0.86 vs. −0.83). Neither method manages to bring X10–X15 anywhere close to the 0.1 threshold. PSM with replacement is clearly the best of the three -- it gets most covariates under 0.13 and the propensity score distance is essentially perfectly balanced. So in terms of matching quality, with-replacement PSM wins by a wide margin here, though it comes at the cost of reusing control units and needing clustered standard errors. The poor balance in the other two methods means their ATT estimates should probably be taken with a grain of salt.
+
+On common support: the sample sizes tables show that 64 control units (out of 2532) went unmatched, meaning they had no reasonably close treated counterpart. No treated units were discarded. So we're not losing a huge chunk of the data, which is reassuring -- but the fact that those 64 controls couldn't find a match does hint at the limited overlap between the groups, which is also visible in the propensity score density plot in the IPW section. The separation in that plot explains why both the matching balance and the IPW weights struggle here.
+
+# Inverse Probability Weighting (IPW)
+```{r}
+# Complete-case sample for IPW variables
+ipw_vars <- c("y", "d", paste0("X", 1:20))
+df_ipw <- casedata_task3[complete.cases(casedata_task3[, ipw_vars]), ]
+
+# 1) Estimate propensity scores with logistic regression
+ps_model <- glm(
+  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+      X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+  data = df_ipw,
+  family = binomial(link = "logit")
+)
+
+df_ipw$ps <- predict(ps_model, type = "response")
+
+# Overlap/common support diagnostic BEFORE trimming
+ggplot(df_ipw, aes(x = ps, color = factor(d), fill = factor(d))) +
+  geom_density(alpha = 0.25) +
+  labs(
+    title = "Propensity Score Overlap (Before Trimming)",
+    x = "Estimated propensity score",
+    y = "Density",
+    color = "Treatment (d)",
+    fill = "Treatment (d)"
+  ) +
+  theme_minimal()
+
+# 2) Trim propensity scores to reduce extreme weights under weak overlap
+df_ipw$ps_trim <- pmin(pmax(df_ipw$ps, 0.01), 0.99)
+
+# Function requested in prompt: two-step IPW ATE with logistic PS + trimming
+estimate_ipw_ate <- function(data, trim = 0.01) {
+  ps_fit <- glm(
+    d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+      X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+    data = data,
+    family = binomial(link = "logit")
+  )
+
+  ps_hat <- predict(ps_fit, newdata = data, type = "response")
+  ps_hat <- pmin(pmax(ps_hat, trim), 1 - trim)
+
+  mean(data$y * (data$d / ps_hat - (1 - data$d) / (1 - ps_hat)))
+}
+
+# 3) Manual IPW ATE using slide formula:
+#    ATE = mean( y * ( d/ps - (1-d)/(1-ps) ) )
+ate_ipw_manual <- estimate_ipw_ate(df_ipw, trim = 0.01)
+
+cat("\nManual IPW ATE (primary estimate):", round(ate_ipw_manual, 4), "\n")
+
+# 4) Bootstrap inference for the full two-step IPW estimator:
+#    re-sample rows, re-estimate propensity model, re-calculate ATE each draw.
+set.seed(123)
+B_ipw <- 1000
+n_ipw <- nrow(df_ipw)
+boot_ipw_ate <- numeric(B_ipw)
+
+for (b in seq_len(B_ipw)) {
+  idx <- sample.int(n_ipw, size = n_ipw, replace = TRUE)
+  boot_data <- df_ipw[idx, ]
+  boot_ipw_ate[b] <- estimate_ipw_ate(boot_data, trim = 0.01)
+}
+
+ipw_boot_mean <- mean(boot_ipw_ate)
+ipw_boot_se <- sd(boot_ipw_ate)
+ipw_boot_ci <- quantile(boot_ipw_ate, probs = c(0.025, 0.975))
+
+cat("Bootstrap mean (IPW):", round(ipw_boot_mean, 4), "\n")
+cat("Bootstrap SE (IPW):", round(ipw_boot_se, 4), "\n")
+cat("95% percentile CI (IPW): [", round(ipw_boot_ci[1], 4), ",", round(ipw_boot_ci[2], 4), "]\n")
+
+# 5) Secondary comparison: IPW weighted regression-adjustment model
+df_ipw$ipw_weight <- ifelse(df_ipw$d == 1,
+                            1 / df_ipw$ps_trim,
+                            1 / (1 - df_ipw$ps_trim))
+
+cat("\nInverse Probability Weights Summary:\n")
+summary(df_ipw$ipw_weight)
+
+lm_ipw <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+             data = df_ipw, weights = ipw_weight)
+
+cat("\nSecondary comparison: weighted lm IPW-RA model\n")
+print(summary(lm_ipw))
+print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3")))
+```
+
+## IPW Critical Discussion Points
+The manual IPW estimate came out at around −318, which obviously doesn't make sense for a sales effect. Looking at the overlap plot above, I think the issue is clear: the propensity score distributions for treated and control are quite separated. A lot of control units have scores close to 0, and when you invert those (dividing by something like 0.01 gives a weight of ~100), a few observations end up dominating the whole estimate. The 0.01/0.99 trimming we used wasn't aggressive enough to fix this.
+
+This is basically the classic problem with IPW -- it's very sensitive to poor overlap. The weighted regression version (~15.81) does much better because the regression component doesn't rely purely on the weights. It also shows why AIPW and DML are generally more appealing: they don't put all their eggs in the weighting basket.
+
+# Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
+This section implements AIPW manually using the doubly robust score:
+
+$$
+ATE = \frac{1}{N}\sum_{i=1}^{N} \left( \frac{T_i}{\hat{p}(X_i)}(Y_i - \hat{\mu}_{T=1}(X_i)) + \hat{\mu}_{T=1}(X_i) \right)
+- \frac{1}{N}\sum_{i=1}^{N} \left( \frac{(1-T_i)}{1-\hat{p}(X_i)}(Y_i - \hat{\mu}_{T=0}(X_i)) + \hat{\mu}_{T=0}(X_i) \right)
+$$
+
+```{r}
+df <- casedata_task3
+df$treatment <- df$d
+df$sales <- df$y
+covariates <- paste0("X", 1:20)
+
+# Basic checks
+stopifnot(all(c("treatment", "sales") %in% names(df)))
+stopifnot(all(covariates %in% names(df)))
+stopifnot(all(na.omit(unique(df$treatment)) %in% c(0, 1)))
+
+# Keep complete cases for variables used in AIPW
+aipw_vars <- c("treatment", "sales", covariates)
+df_aipw <- df[complete.cases(df[, aipw_vars]), aipw_vars]
+
+# AIPW function returning the sample ATE using the manual formula
+estimate_aipw_ate <- function(data, covariate_names, trim = 0.01) {
+  # 1) Selection model (propensity score): P(T=1|X)
+  ps_formula <- as.formula(
+    paste("treatment ~", paste(covariate_names, collapse = " + "))
+  )
+  ps_model <- glm(ps_formula, data = data, family = binomial(link = "logit"))
+  p_hat <- predict(ps_model, newdata = data, type = "response")
+
+  # Trimming avoids extreme inverse-probability weights when overlap is weak
+  p_hat <- pmin(pmax(p_hat, trim), 1 - trim)
+
+  # 2) Outcome models fitted separately by treatment arm
+  mu1_formula <- as.formula(
+    paste("sales ~", paste(covariate_names, collapse = " + "))
+  )
+  mu0_formula <- mu1_formula
+
+  outcome_model_treated <- lm(mu1_formula, data = data[data$treatment == 1, ])
+  outcome_model_control <- lm(mu0_formula, data = data[data$treatment == 0, ])
+
+  # Predicted potential outcomes for every unit
+  mu1_hat <- predict(outcome_model_treated, newdata = data)
+  mu0_hat <- predict(outcome_model_control, newdata = data)
+
+  # 3) Doubly robust correction terms:
+  #    residuals (Y - mu_hat) are reweighted by inverse propensity scores.
+  #    If either the PS model or the outcome models are correctly specified,
+  #    the estimator remains consistent.
+  score_treated <- (data$treatment / p_hat) * (data$sales - mu1_hat) + mu1_hat
+  score_control <- ((1 - data$treatment) / (1 - p_hat)) * (data$sales - mu0_hat) + mu0_hat
+
+  mean(score_treated) - mean(score_control)
+}
+
+# Point estimate
+aipw_ate <- estimate_aipw_ate(df_aipw, covariates, trim = 0.01)
+cat("Manual AIPW ATE estimate:", round(aipw_ate, 4), "\n")
+
+# 4) Bootstrap inference for AIPW
+set.seed(123)
+B <- 1000
+n <- nrow(df_aipw)
+boot_ate <- numeric(B)
+
+for (b in seq_len(B)) {
+  idx <- sample.int(n, size = n, replace = TRUE)
+  boot_data <- df_aipw[idx, ]
+  boot_ate[b] <- estimate_aipw_ate(boot_data, covariates, trim = 0.01)
+}
+
+aipw_se <- sd(boot_ate)
+aipw_ci <- quantile(boot_ate, probs = c(0.025, 0.975))
+aipw_boot_mean <- mean(boot_ate)
+
+cat("Bootstrap mean (AIPW):", round(aipw_boot_mean, 4), "\n")
+cat("Bootstrap SE (AIPW):", round(aipw_se, 4), "\n")
+cat("95% Bootstrap CI (AIPW): [", round(aipw_ci[1], 4), ",", round(aipw_ci[2], 4), "]\n")
+```
+
+## AIPW Critical Discussion Points
+- Doubly robust consistency: AIPW is consistent if either the propensity score model or the outcome regression models are correctly specified.
+- Efficiency: Compared with simple IPW, AIPW is typically more stable and can achieve the semiparametric efficiency bound under correct specification.
+- Debiasing logic: The residual-weighted terms, $(Y - \hat{\mu})$, correct the regression predictions using inverse-probability weighting.
+- Overlap/common support: Propensity scores should stay away from 0 and 1; weak overlap creates extreme weights and unstable estimates, so diagnostics and trimming are important.
+
+# Double Machine Learning (DML): PLR with Cross-Fitting
+We now estimate the ATE with DoubleML using the partially linear regression model:
+
+$$
+Y = \beta D + g(X) + \epsilon, \qquad D = m(X) + \xi
+$$
+
+Cross-fitting (sample splitting) is used to reduce overfitting bias in nuisance estimation, and the orthogonal score makes the final $\beta$ less sensitive to small nuisance-model errors.
+
+```{r}
+# Data setup for DML
+x_cols <- paste0("X", 1:20)
+dml_vars <- c("y", "d", x_cols)
+dml_df <- casedata_task3[complete.cases(casedata_task3[, dml_vars]), dml_vars]
+
+# Binary treatment check
+stopifnot(all(unique(dml_df$d) %in% c(0, 1)))
+
+# DoubleML data backend
+dml_data <- DoubleMLData$new(
+  data = dml_df,
+  y_col = "y",
+  d_cols = "d",
+  x_cols = x_cols
+)
+
+# Tasks for out-of-sample nuisance performance
+# Use only X covariates as predictors to match DML nuisance definitions.
+task_y_data <- dml_df[, c("y", x_cols)]
+task_y <- TaskRegr$new(id = "outcome_task", backend = task_y_data, target = "y")
+
+task_d_data <- dml_df[, x_cols]
+task_d_data$d_factor <- factor(dml_df$d, levels = c(0, 1))
+task_d <- TaskClassif$new(
+  id = "treatment_task",
+  backend = task_d_data,
+  target = "d_factor",
+  positive = "1"
+)
+
+# Helper to construct requested learners with a fallback if IDs differ by install
+get_lrn <- function(primary_id, fallback_id = NULL, ...) {
+  if (primary_id %in% mlr_learners$keys()) {
+    return(lrn(primary_id, ...))
+  }
+  if (!is.null(fallback_id) && fallback_id %in% mlr_learners$keys()) {
+    message("Learner ", primary_id, " not found; using fallback ", fallback_id)
+    return(lrn(fallback_id, ...))
+  }
+  stop("Required learner not found: ", primary_id,
+       if (!is.null(fallback_id)) paste0(" (fallback also missing: ", fallback_id, ")") else "")
+}
+
+# Run one DML specification: nuisance metrics + PLR estimate
+run_dml_spec <- function(spec_name, regr_id, classif_id,
+                         regr_fallback = NULL, classif_fallback = NULL) {
+  set.seed(123)
+
+  # Outcome nuisance model g(X): evaluate out-of-sample RMSE
+  learner_y <- get_lrn(regr_id, regr_fallback)
+  rr_y <- resample(task_y, learner_y$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  rmse_y <- rr_y$aggregate(msr("regr.rmse"))
+
+  # Selection nuisance model m(X): evaluate out-of-sample log-loss and error
+  learner_d_class <- get_lrn(classif_id, classif_fallback, predict_type = "prob")
+  rr_d <- resample(task_d, learner_d_class$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  logloss_d <- rr_d$aggregate(msr("classif.logloss"))
+  ce_d <- rr_d$aggregate(msr("classif.ce"))
+
+  # PLR in DoubleML uses regression nuisance learners for both l(X) and m(X)
+  # (classification learner above is used for requested selection-model diagnostics).
+  learner_m_regr <- get_lrn(regr_id, regr_fallback)
+  dml_plr <- DoubleMLPLR$new(
+    data = dml_data,
+    ml_l = learner_y$clone(),
+    ml_m = learner_m_regr$clone(),
+    n_folds = 5
+  )
+  dml_plr$fit()
+
+  data.frame(
+    Model = spec_name,
+    ATE_Beta = as.numeric(dml_plr$coef),
+    Std_Error = as.numeric(dml_plr$se),
+    RMSE_Y = as.numeric(rmse_y),
+    LogLoss_D = as.numeric(logloss_d),
+    Classif_Error_D = as.numeric(ce_d),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Three requested learner families
+dml_lasso <- run_dml_spec(
+  spec_name = "Lasso",
+  regr_id = "regr.glmnet",
+  classif_id = "classif.lasso",
+  regr_fallback = "regr.cv_glmnet",
+  classif_fallback = "classif.cv_glmnet"
+)
+
+dml_rf <- run_dml_spec(
+  spec_name = "Random Forest",
+  regr_id = "regr.ranger",
+  classif_id = "classif.ranger"
+)
+
+dml_xgb <- run_dml_spec(
+  spec_name = "XGBoost",
+  regr_id = "regr.xgboost",
+  classif_id = "classif.xgboost"
+)
+
+dml_results <- rbind(dml_lasso, dml_rf, dml_xgb)
+dml_results$CI_Lower_95 <- dml_results$ATE_Beta - 1.96 * dml_results$Std_Error
+dml_results$CI_Upper_95 <- dml_results$ATE_Beta + 1.96 * dml_results$Std_Error
+
+cat("\n=== DML (PLR) Comparison Across Learners ===\n\n")
+dml_results_to_print <- dml_results
+num_cols <- sapply(dml_results_to_print, is.numeric)
+dml_results_to_print[num_cols] <- lapply(dml_results_to_print[num_cols], round, 4)
+print(dml_results_to_print, row.names = FALSE)
+
+# "Well-fitting" model selection rule:
+# prioritize low out-of-sample nuisance errors (RMSE_Y and LogLoss_D),
+# because DML relies on high-quality nuisance prediction rather than interpretability.
+scale01 <- function(x) {
+  rng <- range(x)
+  if (diff(rng) == 0) return(rep(0, length(x)))
+  (x - rng[1]) / diff(rng)
+}
+
+dml_results$fit_score <- scale01(dml_results$RMSE_Y) + scale01(dml_results$LogLoss_D)
+best_idx <- which.min(dml_results$fit_score)
+
+cat("\nBest-fitting nuisance combination (lower RMSE + LogLoss):",
+    dml_results$Model[best_idx], "\n")
+```
+
+## DML Discussion Points
+- DML solves regularization bias and overfitting bias: sample splitting and cross-fitting reduce overfitting from flexible learners.
+- Predictive performance of nuisance models is central: lower RMSE/log-loss means cleaner residualization (orthogonalization) for treatment-effect estimation.
+- Compared with weighting estimators, PLR-style partialling out avoids direct division by propensity scores, which can be more stable under weak overlap.
+- Even with ML-based nuisance models, causal validity still depends on conditional independence and excluding bad controls (e.g., colliders).
+
+
+# Comparison of Treatment Effects Across Methods
+
+```{r}
+# Extract treatment effects and standard errors from all methods
+ate_regression <- coef(model_adj)["d"]
+se_regression <- sqrt(diag(vcovHC(model_adj, type = "HC3")))["d"]
+
+att_no_replace <- coef(model_no_replace)["d"]
+se_no_replace <- sqrt(diag(vcovHC(model_no_replace, type = "HC3")))["d"]
+
+att_with_replace <- coef(model_with_replace)["d"]
+se_with_replace <- sqrt(diag(vcovCL(model_with_replace, cluster = ~subclass)))["d"]
+
+ate_euc <- coef(lm_euc)["d"]
+se_euc <- sqrt(diag(vcovHC(lm_euc, type = "HC3")))["d"]
+
+ate_ipw <- ate_ipw_manual
+se_ipw <- ipw_boot_se
+
+ate_ipw_lm <- coef(lm_ipw)["d"]
+se_ipw_lm <- sqrt(diag(vcovHC(lm_ipw, type = "HC3")))["d"]
+
+ate_aipw <- aipw_ate
+se_aipw <- aipw_se
+
+# Calculate 95% confidence intervals
+ci_lower_reg <- ate_regression - 1.96 * se_regression
+ci_upper_reg <- ate_regression + 1.96 * se_regression
+
+ci_lower_no_rep <- att_no_replace - 1.96 * se_no_replace
+ci_upper_no_rep <- att_no_replace + 1.96 * se_no_replace
+
+ci_lower_rep <- att_with_replace - 1.96 * se_with_replace
+ci_upper_rep <- att_with_replace + 1.96 * se_with_replace
+
+ci_lower_euc <- ate_euc - 1.96 * se_euc
+ci_upper_euc <- ate_euc + 1.96 * se_euc
+
+ci_lower_ipw <- ipw_boot_ci[1]
+ci_upper_ipw <- ipw_boot_ci[2]
+
+ci_lower_ipw_lm <- ate_ipw_lm - 1.96 * se_ipw_lm
+ci_upper_ipw_lm <- ate_ipw_lm + 1.96 * se_ipw_lm
+
+ci_lower_aipw <- aipw_ci[1]
+ci_upper_aipw <- aipw_ci[2]
+
+# Create base comparison table for classical/weighting estimators
+comparison_table_base <- data.frame(
+  Method = c(
+    "Regression Adjustment",
+    "Matching (1:1 No Replacement)",
+    "Matching (1:1 With Replacement)",
+    "Euclidean Distance Matching",
+    "Inverse Probability Weighting (IPW) - Manual Formula",
+    "IPW Weighted Regression (Secondary)",
+    "Augmented IPW (AIPW) - Manual Formula"
+  ),
+  Estimand = c(
+    "ATE",
+    "ATT",
+    "ATT",
+    "ATT",
+    "ATE",
+    "ATE",
+    "ATE"
+  ),
+  Inference = c(
+    "HC3",
+    "HC3",
+    "Clustered (subclass)",
+    "HC3",
+    "Bootstrap (1000)",
+    "HC3",
+    "Bootstrap (1000)"
+  ),
+  Estimate = c(
+    round(ate_regression, 4),
+    round(att_no_replace, 4),
+    round(att_with_replace, 4),
+    round(ate_euc, 4),
+    round(ate_ipw, 4),
+    round(ate_ipw_lm, 4),
+    round(ate_aipw, 4)
+  ),
+  Std_Error = c(
+    round(se_regression, 4),
+    round(se_no_replace, 4),
+    round(se_with_replace, 4),
+    round(se_euc, 4),
+    round(se_ipw, 4),
+    round(se_ipw_lm, 4),
+    round(se_aipw, 4)
+  ),
+  CI_Lower = c(
+    round(ci_lower_reg, 4),
+    round(ci_lower_no_rep, 4),
+    round(ci_lower_rep, 4),
+    round(ci_lower_euc, 4),
+    round(ci_lower_ipw, 4),
+    round(ci_lower_ipw_lm, 4),
+    round(ci_lower_aipw, 4)
+  ),
+  CI_Upper = c(
+    round(ci_upper_reg, 4),
+    round(ci_upper_no_rep, 4),
+    round(ci_upper_rep, 4),
+    round(ci_upper_euc, 4),
+    round(ci_upper_ipw, 4),
+    round(ci_upper_ipw_lm, 4),
+    round(ci_upper_aipw, 4)
+  ),
+  row.names = NULL
+)
+
+# Add DML learner-specific estimates to the same comparison table
+dml_comparison <- data.frame(
+  Method = paste0("DML-PLR (", dml_results$Model, ")"),
+  Estimand = rep("ATE", nrow(dml_results)),
+  Inference = rep("Orthogonal score SE (cross-fit)", nrow(dml_results)),
+  Estimate = round(dml_results$ATE_Beta, 4),
+  Std_Error = round(dml_results$Std_Error, 4),
+  CI_Lower = round(dml_results$CI_Lower_95, 4),
+  CI_Upper = round(dml_results$CI_Upper_95, 4),
+  row.names = NULL
+)
+
+comparison_table <- rbind(comparison_table_base, dml_comparison)
+
+cat("\n=== Summary: Treatment Effects Across All Methods (with 95% CIs) ===\n\n")
+print(comparison_table, row.names = FALSE)
+
+cat("\nNote: ATT rows are matching estimands; all other rows report ATE.\n")
+cat("DML rows include learner-specific PLR estimates with 5-fold cross-fitting and orthogonal-score inference.\n")
+```
+
+# Discussion
+
+One thing worth noting upfront is that every method used here relies on the same assumption: that the 20 covariates are enough to account for all the confounding between who gets the discount and how much they buy. We can't really test this -- if there's something unobserved driving both treatment and sales (e.g., customer motivation), all of these estimates could be off. But given that we have 20 covariates covering demographics and purchasing behavior, it seems like a reasonable assumption for this dataset.
+
+## 1. Comparison of ATE vs. ATT Estimates
+An important thing to keep in mind when comparing the results is that not all methods estimate the same thing.
+
+* **ATE methods** (Regression, IPW, AIPW, DML) estimate the effect if the discount were given to everyone. Ignoring the broken manual IPW, these range from roughly **13.70 to 18.85**.
+* **ATT methods** (Matching) estimate the effect for the customers who actually got the discount, ranging from about **16.16 to 23.25**.
+
+The ATT estimates being higher than the ATE could suggest that the customers who received the discount also happen to respond more strongly to it -- something like selection on returns. Though we're not 100% sure this isn't partly driven by differences in how the methods handle the data (e.g., the poor balance in the without-replacement matching might inflate things).
+
+---
+
+## 2. Methodological Divergence and Instability
+
+* **IPW blowup:** The manual IPW gave −318, which is nonsense. we already discussed this above -- it's an overlap problem with extreme weights. The weighted regression IPW (~15.81) is much more reasonable since it doesn't rely only on the weights.
+* **Matching differences:** The without-replacement estimate (17.15) and with-replacement estimate (23.25) are pretty far apart. Given the balance diagnostics, we'd trust the with-replacement version more -- the without-replacement matching left large SMDs on X10–X14, so those matched pairs weren't really comparable. The with-replacement version got balance mostly under control, though it comes with more variance from reusing controls.
+
+---
+
+## 3. The Role of Double Robustness and Machine Learning
+
+* **AIPW (18.85)** is doubly robust -- it stays consistent if either the propensity score model or the outcome model is right. In theory it should also be more efficient than plain IPW.
+* **DML** results vary by learner:
+    * XGBoost: 18.35
+    * Lasso: 15.23
+    * Random Forest: 13.70
+
+The fact that XGBoost and AIPW land in a similar range (~18) is interesting -- it might mean there are some non-linearities in the covariate-outcome relationship that OLS misses but these methods pick up. The Random Forest estimate being lower is a bit puzzling and could reflect differences in how well the nuisance models fit.
+
+---
+
+## 4. Conclusion: Which Estimate to Trust?
+We'd lean toward trusting the **AIPW** or **DML-XGBoost** estimates, for a few reasons:
+
+1. They don't assume linearity the way plain regression does.
+2. AIPW has the double robustness property, which gives some insurance against model misspecification.
+3. They use the full dataset rather than discarding unmatched units, so they're answering the ATE question more directly.
+
+That said, none of these methods can fully overcome the unconfoundedness assumption. If there are important unobserved confounders, all estimates could be biased.
+
+### Suggestions for the Marketing Manager
+Across all the credible methods, the discount seems to increase sales by roughly \$15–19 per customer (ATE). The campaign appears to work. Whether it's worth expanding depends on the cost of the discount itself -- if the discount costs less than \$15 per customer, broader rollout looks profitable.
+
+For the customers currently being targeted, the effect might be even larger (~\$17–23 based on matching ATT). So the existing targeting seems to be picking customers who respond well.
+
+If the company wants to be more confident before scaling up, running a proper randomized experiment on a sample of untargeted customers would help. That would give a clean ATE estimate without having to worry about whether the covariates capture everything. For now, the observational evidence is encouraging but comes with the usual caveat that we're assuming the data accounts for all relevant confounders.
+
+# Reflection on AI Use
+
+We used AI tools at various points during this assignment, mainly in a supporting role rather than for generating the analysis or writing from scratch.
+
+**Tools used:** Primarily Google Gemini for code-related tasks, and NotebookLM for revisiting theoretical concepts from the course material.
+
+**What we used AI for:**
+
+- Debugging code when we ran into errors or unexpected output, and getting suggestions on how to improve code quality (e.g., fixing syntax issues, making sure we were using the right functions from MatchIt or DoubleML).
+- Checking for oversights in our analysis -- essentially using it as a second pair of eyes to see if we missed something obvious or made a methodological mistake.
+- Searching for information to refresh our understanding of the theory behind the methods, particularly around IPW, AIPW, and how DML cross-fitting works.
+- NotebookLM was useful for going back over course readings and lecture material to make sure we had the concepts right before writing up the discussion.
+
+**How we handled AI input:** We treated AI suggestions as starting points rather than final answers. When it flagged something or suggested a change, I checked it against the course material and our own understanding before incorporating it. The analytical choices, interpretations, and written discussion are our own.
