@@ -18,6 +18,7 @@ library(readr)
 library(plm)
 library(lmtest)
 library(knitr)
+library(ggplot2)
 ```
 
 # Import Data
@@ -31,7 +32,9 @@ df <- df %>%
     # 'post_treatment' is 1 for the weeks after the marketing strategy started
     post_treatment = ifelse(Weekind >= 78, 1, 0),
     # 'treated' is the actual interaction / DiD term (1 ONLY for Store 109 AND Weekind >= 78)
-    treated = ifelse(storeNum == 109 & Weekind >= 78, 1, 0)
+    treated = ifelse(storeNum == 109 & Weekind >= 78, 1, 0),
+    # Variable identifying the treated store (regardless of time)
+    is_treated_store = ifelse(storeNum == 109, 1, 0)
   )
 
 # Display the structure of the data to verify column names
@@ -43,7 +46,7 @@ head(df)
 <!-- # Use only treatment + appropriate pre-treatment covariates -->
 
 # A simple pre-post analysis of only the treated store for each product controlling for relevant covariates
-The relevant covariates chosen are price and promotion for each product, as they are likely to influence sales. Time-invariant covariates such as store size and city size are excluded from this analysis since we are only looking at one store (Store 109) and they do not vary over time.
+The relevant covariates chosen are price and promotion for each product, as they are likely to influence sales. Time-invariant covariates such as store size and city size are excluded from this analysis sicne these stable factors are automatically controlled without requiring additional covariates. For this method to output an appropriate causal estimate, we would need to assume that no other external factors influenced sales at Store 109 between the pre- and post-treatment weeks. (This is a strong and unlikely assumption for this dataset, which is why we expect that more advanced methods like Two-Way Fixed Effects or Synthetic Control are generally more appropriate for establishing causality)
 
 ```{r}
 #| label: pre-post analysis
@@ -61,10 +64,12 @@ summary(pre_post_p2)
 ```
 
 # A simple two-way fixed-effect panel model for each product controlling for relevant covariates
-Store fixed effects will automatically absorb (control for) all time-invariant store characteristics (like storesize and city). Time fixed effects will absorb aggregate shocks that affect all stores in a given week. Therefor no particular changed will be made to the data, as the plm package will handle this automatically when we specify the model.
+Store fixed effects will automatically absorb (control for) all time-invariant store characteristics (like storesize and city). Time fixed effects will absorb aggregate shocks that affect all stores in a given week. By accounting for these factors, the TWFE model addresses the primary endogeneity problem of unobserved effects that are either subject-invariant or time-invariant. While the simple pre-post model assumes the counterfactual outcome remains constant over time, the TWFE model (within a Difference-in-Differences framework) relaxes this by assuming that treatment and control groups would follow parallel trends in the absence of treatment. Where this is assumed to produce smaller standard errors and tighter confidence intervals and allowing for a more granular analysis of heterogeneity on the individual and time dimensions rather than just group-level averages in contrast to pre-post analysis, the introduction of the parallel trends assumption also means that if the treated store had a unique sales trajectory that was not shared by any control stores, the TWFE estimate could be biased.
 
 ```{r}
 #| label: two-way fixed effects analysis
+
+# Convert the data frame to a panel data frame for plm
 pdf <- pdata.frame(df, index = c("storeNum", "Weekind"))
 
 # --- Product 1: TWFE Model ---
@@ -94,6 +99,73 @@ coeftest(twfe_p2, vcov = vcovHC(twfe_p2, type = "HC1", cluster = "group"))
 ```
 
 # Simple DiD, SC, and SDID analyses for each product
+
+## Check for parallel trends assumption
+
+### Visual inspection of pre-treatment trends
+Ideally, the treated store's sales should follow a similar trajectory to the control stores in the pre-treatment period. If the treated store had a unique sales pattern that was not shared by any control stores, this would violate the parallel trends assumption and could bias our estimates. By plotting the average sales of the treated store against the average sales of the control stores over time, we can visually assess whether they exhibit similar trends before the treatment starts (Weekind < 78). If they do, this supports the validity of our DiD and SDID analyses; if not, we may need to consider alternative methods or be cautious in interpreting our results.
+```{r}
+#| label: Visual inspection of parallel trends assumption  
+
+# --- Product 1 Plot ---
+# Aggregate average sales per week for treated vs control stores
+trend_data_p1 <- df %>%
+  group_by(Weekind, is_treated_store) %>%
+  summarise(mean_sales = mean(p1sales, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(Group = ifelse(is_treated_store == 1, "Treated (Store 109)", "Control (Other Stores)"))
+
+plot_p1 <- ggplot(trend_data_p1, aes(x = Weekind, y = mean_sales, color = Group)) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = 78, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = 76, y = max(trend_data_p1$mean_sales), 
+           label = "Treatment Start", angle = 90, vjust = 1.5, color = "red") +
+  labs(title = "Product 1: Sales Trends (Treated vs Control)",
+       x = "Week Index",
+       y = "Average Weekly Sales") +
+  theme_minimal()
+
+print(plot_p1)
+
+# --- Product 2 Plot ---
+trend_data_p2 <- df %>%
+  group_by(Weekind, is_treated_store) %>%
+  summarise(mean_sales = mean(p2sales, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(Group = ifelse(is_treated_store == 1, "Treated (Store 109)", "Control (Other Stores)"))
+
+plot_p2 <- ggplot(trend_data_p2, aes(x = Weekind, y = mean_sales, color = Group)) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = 78, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = 76, y = max(trend_data_p2$mean_sales), 
+           label = "Treatment Start", angle = 90, vjust = 1.5, color = "red") +
+  labs(title = "Product 2: Sales Trends (Treated vs Control)",
+       x = "Week Index",
+       y = "Average Weekly Sales") +
+  theme_minimal()
+
+print(plot_p2)
+```
+
+### Statistical test for parallel trends: Pre-treatment interaction model
+Additionally to doing the visual inspection, we can also run a formal statistical test for parallel trends by regressing sales on the store dummy, a linear time trend (Weekind), and their interaction, but only using the pre-treatment data (Weeks 1 to 77). If the coefficient on the interaction term is statistically significant, it would suggest that the treated store had a different trend compared to the control stores even before the treatment started, which would violate the parallel trends assumption and potentially bias our DiD and SDID estimates.
+```{r}
+#| label: Check for parallel trends assumption 
+# Filter the data to ONLY include the pre-treatment period (Weeks 1 to 77)
+df_pre <- df %>% filter(Weekind < 78)
+
+# --- Product 1: Parallel Trends Test ---
+pt_test_p1 <- lm(p1sales ~ is_treated_store * Weekind, data = df_pre)
+summary(pt_test_p1)
+
+# --- Product 2: Parallel Trends Test ---
+pt_test_p2 <- lm(p2sales ~ is_treated_store * Weekind, data = df_pre)
+summary(pt_test_p2)
+```
+
+**Findings:**
+For both products, the visual interpretation leads to believe that there is a slight positive trend in the treated store's sales compared to the control stores in the pre-treatment period, which could potentially violate the parallel trends assumption. However, the formal statistical test for parallel trends (the interaction term between the treated store dummy and the linear time trend [is_treated_store:Weekind]) is not statistically significant for either product (p > 0.05). This suggests that while there may be some visual differences in trends, they are not statistically significant enough to conclusively reject the parallel trends assumption possibly due to limited sample size or high variability. Therefore, we can proceed with our DiD and SDID analyses, but we should be cautious in interpreting the results given the potential for some underlying differences in pre-treatment trends.
+
+## Evaluating the treatment effect using DiD, SC, and SDID methods for each product
+
 ### Product 1: p1sales
 ```{r}
 #| label: DiD, SC, and SDID analyses for Product 1
@@ -119,18 +191,6 @@ estimates_p1 = list(did_est_p1, sc_est_p1, sdid_est_p1)
 # Print the estimates
 names(estimates_p1) = c('Diff-in-Diff', 'Synthetic Control', 'Synthetic Diff-in-Diff')
 print(unlist(estimates_p1))
-
-# Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
-se_p1 <- sqrt(vcov(sdid_est_p1, method = "placebo"))
-cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p1 - 1.96 * se_p1, sdid_est_p1 + 1.96 * se_p1))
-
-# Calculate standard errors and 95% Confidence Intervals using placebo method for DID
-se_p1 <- sqrt(vcov(did_est_p1, method = "placebo"))
-cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p1 - 1.96 * se_p1, did_est_p1 + 1.96 * se_p1))
-
-# Calculate standard errors and 95% Confidence Intervals using placebo method for SC
-se_p1 <- sqrt(vcov(sc_est_p1, method = "placebo"))
-cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p1 - 1.96 * se_p1, sc_est_p1 + 1.96 * se_p1))
 
 # Plot 1: Trends of treated vs. synthetic control
 synthdid_plot(estimates_p1, facet.vertical = FALSE)
@@ -161,25 +221,78 @@ estimates_p2 = list(did_est_p2, sc_est_p2, sdid_est_p2)
 names(estimates_p2) = c('Diff-in-Diff', 'Synthetic Control', 'Synthetic Diff-in-Diff')
 print(unlist(estimates_p2))
 
-# Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
-se_p2 <- sqrt(vcov(sdid_est_p2, method = "placebo"))
-cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p2 - 1.96 * se_p2, sdid_est_p2 + 1.96 * se_p2))
-
-# Calculate standard errors and 95% Confidence Intervals using placebo method for DID
-se_p2 <- sqrt(vcov(did_est_p2, method = "placebo"))
-cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p2 - 1.96 * se_p2, did_est_p2 + 1.96 * se_p2))
-
-# Calculate standard errors and 95% Confidence Intervals using placebo method for SC
-se_p2 <- sqrt(vcov(sc_est_p2, method = "placebo"))
-cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p2 - 1.96 * se_p2, sc_est_p2 + 1.96 * se_p2))
-
 # Plot 1: Trends of treated vs. synthetic control
 synthdid_plot(estimates_p2, facet.vertical = FALSE)
 # Plot 2: See which control stores received the highest weights
 synthdid_units_plot(estimates_p2)
 ```
 
-## Regressing out the covariates
+```{r}
+#| include: false
+
+# # IN CASE I WANT TO USE THIS LATER
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
+# se_p1 <- sqrt(vcov(sdid_est_p1, method = "placebo"))
+# cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p1 - 1.96 * se_p1, sdid_est_p1 + 1.96 * se_p1))
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for DID
+# se_p1 <- sqrt(vcov(did_est_p1, method = "placebo"))
+# cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p1 - 1.96 * se_p1, did_est_p1 + 1.96 * se_p1))
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for SC
+# se_p1 <- sqrt(vcov(sc_est_p1, method = "placebo"))
+# cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p1 - 1.96 * se_p1, sc_est_p1 + 1.96 * se_p1))
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for SDID
+# se_p2 <- sqrt(vcov(sdid_est_p2, method = "placebo"))
+# cat(sprintf("(SDID) 95%% CI: [%.2f, %.2f]\n", sdid_est_p2 - 1.96 * se_p2, sdid_est_p2 + 1.96 * se_p2))
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for DID
+# se_p2 <- sqrt(vcov(did_est_p2, method = "placebo"))
+# cat(sprintf("(DID) 95%% CI: [%.2f, %.2f]\n", did_est_p2 - 1.96 * se_p2, did_est_p2 + 1.96 * se_p2))
+
+# # Calculate standard errors and 95% Confidence Intervals using placebo method for SC
+# se_p2 <- sqrt(vcov(sc_est_p2, method = "placebo"))
+# cat(sprintf("(SC) 95%% CI: [%.2f, %.2f]\n", sc_est_p2 - 1.96 * se_p2, sc_est_p2 + 1.96 * se_p2))
+```
+
+# Expensions to the analysis
+Two possible expansions to the analysis include:
+
+1. Running a panel regression-based difference-in-differences model that includes relevant covariates for "pooling". This implies that it treats the entire dataset as a single pool of observations and uses Ordinary Least Squares (OLS) to estimate the coefficients for dummy veriables to handle store-level and time-period variation.
+2. Implementing a version of the SDID method that first regresses out the effects of price and promotions (using the Frisch-Waugh-Lovell theorem) before applying the SDID estimator to the residuals. This will allow us to see how controlling for these covariates in a more flexible way (without assuming linearity or additivity) affects the estimates and their precision.
+
+## Panel regression difference-in-differences
+To further explore the data, we can also run a panel regression with a difference-in-differences specification that includes the relevant covariates. This will allow us to compare the results from this more traditional econometric approach with the estimates obtained from the SDID method.
+
+### Product 1: Panel DiD WITH Covariates
+```{r}
+#| label: Panel DiD with Covariates for Product 1
+did_cov_p1 <- plm(p1sales ~ is_treated_store + post_treatment + treated + 
+                            p1price + p1prom + compind + storesize + citysize, 
+                  data = pdf, 
+                  model = "pooling")
+summary(did_cov_p1)
+
+# Product 1: Covariate DiD with Clustered Standard Errors
+coeftest(did_cov_p1, vcov = vcovHC(did_cov_p1, type = "HC1", cluster = "group"))
+```
+
+### Product 2: Panel DiD WITH Covariates
+```{r}
+#| label: Panel DiD with Covariates for Product 2
+did_cov_p2 <- plm(p2sales ~ is_treated_store + post_treatment + treated + 
+                            p2price + p2prom + compind + storesize + citysize, 
+                  data = pdf, 
+                  model = "pooling")
+summary(did_cov_p2)
+
+# Product 2: Covariate DiD with Clustered Standard Errors
+coeftest(did_cov_p2, vcov = vcovHC(did_cov_p2, type = "HC1", cluster = "group"))
+```
+
+## Synthetic DiD regressing out the covariates
 Given that the base synthdid package used does not easily accept additional control variables (like price and promotions) directly into its primary matrix setup, we can implement a solution based on the Frisch-Waugh-Lovell (FWL) theorem: we first use a linear regression to predict sales based only on the covariates, extract the residuals (the portion of sales unexplained by price, promotions, etc.), and then apply the SDID model to those residuals.
 
 By adding the overall mean back to the residuals, we keep the interpretation on the same scale as the original sales volume.
@@ -216,7 +329,6 @@ plot(sdid_est_p1_adj)+theme_minimal()
 ```
 
 ### Product 2: p2sales
-
 ```{r}
 #| label: Regressing out covariates for Product 2
 
@@ -248,16 +360,18 @@ plot(sdid_est_p2_adj)+theme_minimal()
 ```
 
 # Summary of Findings
-
 ```{r}
 #| label: compile-results-table
 #| echo: false
 #| message: false
 
-# 1. Extract robust standard errors from the TWFE models
+# 1. Extract robust standard errors from the TWFE and Panel DiD models
 # (We run coeftest again here to easily extract the values)
 robust_twfe_p1 <- coeftest(twfe_p1, vcov = vcovHC(twfe_p1, type = "HC1", cluster = "group"))
 robust_twfe_p2 <- coeftest(twfe_p2, vcov = vcovHC(twfe_p2, type = "HC1", cluster = "group"))
+
+robust_did_cov_p1 <- coeftest(did_cov_p1, vcov = vcovHC(did_cov_p1, type = "HC1", cluster = "group"))
+robust_did_cov_p2 <- coeftest(did_cov_p2, vcov = vcovHC(did_cov_p2, type = "HC1", cluster = "group"))
 
 # 2. Create a consolidated data frame with Estimates and Standard Errors (SE)
 results_summary <- data.frame(
@@ -265,6 +379,7 @@ results_summary <- data.frame(
     "Pre-Post (LM)", 
     "Two-Way Fixed Effects (TWFE)", 
     "Difference-in-Differences (DID)", 
+    "Panel DID (with Covariates)",
     "Synthetic Control (SC)", 
     "Synthetic DID (SDID)", 
     "Adjusted SDID (with Covariates)"
@@ -275,6 +390,7 @@ results_summary <- data.frame(
     coef(pre_post_p1)["post_treatment"],
     robust_twfe_p1["treated", "Estimate"],
     as.numeric(did_est_p1),
+    robust_did_cov_p1["treated", "Estimate"],
     as.numeric(sc_est_p1),
     as.numeric(sdid_est_p1),
     as.numeric(sdid_est_p1_adj)
@@ -283,6 +399,7 @@ results_summary <- data.frame(
     summary(pre_post_p1)$coefficients["post_treatment", "Std. Error"],
     robust_twfe_p1["treated", "Std. Error"],
     as.numeric(sqrt(vcov(did_est_p1, method = "placebo"))),
+    robust_did_cov_p1["treated", "Std. Error"],
     as.numeric(sqrt(vcov(sc_est_p1, method = "placebo"))),
     as.numeric(sqrt(vcov(sdid_est_p1, method = "placebo"))),
     as.numeric(sqrt(vcov(sdid_est_p1_adj, method = "placebo")))
@@ -293,6 +410,7 @@ results_summary <- data.frame(
     coef(pre_post_p2)["post_treatment"],
     robust_twfe_p2["treated", "Estimate"],
     as.numeric(did_est_p2),
+    robust_did_cov_p2["treated", "Estimate"],
     as.numeric(sc_est_p2),
     as.numeric(sdid_est_p2),
     as.numeric(sdid_est_p2_adj)
@@ -301,6 +419,7 @@ results_summary <- data.frame(
     summary(pre_post_p2)$coefficients["post_treatment", "Std. Error"],
     robust_twfe_p2["treated", "Std. Error"],
     as.numeric(sqrt(vcov(did_est_p2, method = "placebo"))),
+    robust_did_cov_p2["treated", "Std. Error"],
     as.numeric(sqrt(vcov(sc_est_p2, method = "placebo"))),
     as.numeric(sqrt(vcov(sdid_est_p2, method = "placebo"))),
     as.numeric(sqrt(vcov(sdid_est_p2_adj, method = "placebo")))
@@ -316,3 +435,87 @@ kable(
   align = "lcccc"
 )
 ```
+
+## Conclusions
+### Pre-Post Analysis
+In the Pre-Post analysis of Store 109, the pre-post model yielded the following estimates:
+
+* __Product 1:__ A significant increase of approximately 33.69 units $(p<0.001)$
+* __Product 2:__ A significant decrease of approximately 29.71 units $(p<0.001)$
+
+While these numbers provide a clear description of the sales change at Store 109, they are only "appropriate" causal estimates if no other external factors influenced sales between the pre- and post-treatment weeks. If, for example, a competitor ran a major promotion on Product 2 during the same week as the treatment, the pre-post model would wrongly conclude that the in-store marketing caused the sales drop. Therefore, while useful for initial descriptive analysis, more advanced methods like the Two-Way Fixed Effect (TWFE) model or Synthetic Control are generally more appropriate for establishing causality in this dataset as they account for time-varying aggregate shocks.
+
+### Two-Way Fixed Effects (TWFE) Analysis
+In the Two-Way Fixed Effects analysis of Store 109, the TWFE model provided more nuanced estimates compared to the naive Pre-Post model:
+
+* __Product 1:__ The TWFE estimate was 29.98 units (SE: 4.03), slightly lower and more conservative than the Pre-Post estimate of 33.69
+* __Product 2:__ The TWFE estimate was -34.29 units (SE: 4.45), showing a more pronounced decrease than the Pre-Post estimate of -29.71
+
+These differences highlight that the TWFE model is more appropriate than the Pre-Post model because it adjusts for weekly sales fluctuations across the entire retail chain, preventing those general trends from being incorrectly attributed to the specific in-store marketing treatment.
+
+### Difference-in-Differences (DID) Analysis
+In the Difference-in-Differences analysis of Store 109, the simple DID model provided the following results:
+
+* __Product 1:__ Estimate of 32.22 units (SE: 19.88)
+* __Product 2:__ Estimate of -22.26 units (SE: 20.14)
+
+Notably, the standard errors for the simple DID in this specific task were significantly larger than those of the Two-Way Fixed Effects (TWFE) or Adjusted SDID models. This suggests that while a simple DID is a theoretical improvement over a pre-post model, it may lack precision in datasets with high variance between stores unless more granular controls (like fixed effects or matching) are incorporated. While these additions could possibly reduce the standard errors, by looking at the graph, we can see that the data does not follow the parallel trends assumption very well, which is likely contributing to the large standard errors. Therefore, while the simple DID is a step in the right direction for causal inference, it may not be the most appropriate method for this dataset without further adjustments.
+
+### Panel DiD with Covariates Analysis
+In the Panel DiD with Covariates analysis of Store 109, the model provided the following estimates:
+
+* __Product 1:__ Estimate of 29.97 units (SE: 4.04)
+* __Product 2:__ Estimate of -34.35 units (SE: 4.46)
+
+The estimates for Product 1 (29.98 vs 29.97) and Product 2 (-34.29 vs -34.35) are almost identical to the TWFE model's estimates. This indicates that the explicit covariates included in the Panel DID model successfully captured nearly all the systematic store-level differences that the TWFE model's fixed effects would have absorbed. Also like the TWFE model, the Panel DiD with Covariates model shows very high precision (SEs ~4.0) compared to a Simple DID (SEs ~20.0). This is posibly because both models include prices and promotions as covariates, which tend to have noticeable impact on sales volume. By explaining this variance, both models significantly reduce the noise in the residuals. With that said, the Simple TWFE model is generally considered more robust because it controls for all store characteristics, even those that are not seen or measured. If there were an unobserved store difference not captured by _citysize_ or _storesize_, the pooling model could be biased. However, the near-identical results suggest that these covariates were comprehensive for this specific task.
+
+### Synthetic Control (SC) Analysis
+In the Synthetic Control analysis of Store 109, the SC model provided the following estimates:
+
+* __Product 1:__ Estimate of 36.37 units (SE: 11.83)
+* __Product 2:__ Estimate of -25.98 units (SE: 33.54)
+
+While SC provided the highest positive estimate for Product 1, its standard errors in this specific task were notably larger than those of more advanced hybrid methods like Synthetic DID (SDID) or Two-Way Fixed Effects (TWFE). This also aligns with the visual inspection of the trends, where the synthetic control had a reasonable pre-treatment fit but due to the high amount of noise in the data, the post-treatment estimate is less precise and potentially overfitted. This suggests that while SC is appropriate for defining the counterfactual based on pre-treatment trends, its precision can be lower in retail panels unless combined with additional regularization or time-weighting (as seen in SDID).
+
+### Synthetic Difference-in-Differences (SDID) and Adjusted SDID Analysis
+In the Synthetic Difference-in-Differences analysis of Store 109, the SDID models provided the following estimates:
+
+* __Product 1:__ Pure SDID Estimate of 14.89 (SE: 8.63)
+* __Product 2:__ Pure SDID Estimate of -42.64 (SE: 10.14)
+* __Product 1:__ Adjusted SDID Estimate of 18.52 (SE: 3.64)
+* __Product 2:__ Adjusted SDID Estimate of -42.65 (SE: 6.80)
+
+**Precision:** The Adjusted SDID yielded the smallest standard errors for both products. This was achieved by using the Frisch-Waugh-Lovell (FWL) theorem to first "regress out" the effects of prices and promotions before applying the SDID estimator.
+
+**Conservatism vs. Magnitude:** For Product 1, the SDID estimate (18.52) was significantly more conservative than the naive Pre-Post (33.69) or simple DID (32.22) models. This suggests that earlier models were likely overestimating the marketing effect by failing to account for specific control units that shared Store 109’s unique sales trajectory.
+
+**Reliability:** For Product 2, the SDID estimate (-42.65) showed a much stronger negative impact than the simple DID (-22.26). This indicates that when control units are reweighted to match the treated store's specific behavior, the sales drop appears even more severe.
+
+**Final considerations:** The SDID approach, especially when adjusted for covariates, appears to provide the most reliable and precise estimates of the treatment effect in this retail panel context. It effectively combines the strengths of both SC (defining a data-driven counterfactual) and DID (leveraging time variation), while also controlling for confounding factors through regression adjustment.
+However it is very important to consider: because SDID often weights only a few time periods directly before the treatment, the estimate can be sensitive to noise in those specific weeks; to prevent over-reliance on a single control unit and ensure a unique solution, SDID uses a regularization constant (ξ) to disperse unit weights; similar to SC, the credibility of SDID rests on the quality of the pre-treatment fit; if the weighted controls cannot reasonably mimic the treated unit's trend, the resulting estimate may be biased.
+With those considerations in mind, the SDID method, particularly when adjusted for covariates, appears to be the most appropriate and reliable method for estimating the causal effect of the in-store marketing strategy on sales in this dataset.
+
+## Final decision:
+
+### Recommendations to Management
+The primary recommendation is to proceed with caution regarding a full-scale rollout of this marketing strategy. While the strategy successfully drives sales for Product 1, it appears to have a significant negative impact on Product 2 sales. Management should investigate whether this represents a "cannibalization" effect or if the marketing for Product 1 is actively deterring Product 2 purchases. Before a chain-wide implementation, it is essential to calculate the net profit margin of these changes, as the volume loss in Product 2 (~42 units) is more than double the volume gain in Product 1 (~18 units)
+
+### Effectiveness and Expected Sales Uplift
+Based on the most precise and realiable model [_Adjusted Synthetic DID (SDID)_] the strategy is effective at changing sales levels, but the direction varies by product:
+
+* __Product 1:__ You can expect a statistically significant expected uplift of approximately 18.52 units per week (SE: 3.64). This estimate is more reliable and conservative than the naive pre-post estimate (33.69), which likely overestimated the effect by failing to account for general market trends.
+* __Product 2:__ You should expect a statistically significant decrease of approximately 42.65 units per week (SE: 6.80). This negative impact is substantial and was consistent across all advanced models (TWFE and SDID).
+
+### Potential Challenges in the Data
+Several characteristics of the retail dataset pose challenges to established causal inference:
+
+* __Violation of Parallel Trends:__ Visual inspection and the high standard errors in the simple DID model (~20.0) suggest that Store 109 did not follow the same pre-treatment trajectory as the average of the control stores. Relying on simple models would therefore lead to biased estimates.
+* __Independent Price Setting:__ Because store managers set prices independently at each store, price becomes an endogenous factor that varies over both time and units. If these price changes coincide with the marketing treatment, they can confound the results.
+* __Selection Bias:__ The treatment was not randomized; Store 109 was specifically chosen. This introduces "selection on unobservables," where unique characteristics of that store (e.g., local management culture) might make it more or less responsive to marketing than other stores.
+
+### Ideas to Overcome These Challenges
+To address the data challenges identified, the following methodological approaches were implemented:
+
+* __Weighted Counterfactuals (SDID):__ To overcome the lack of parallel trends, Synthetic DID was used, which reweights control stores and pre-treatment weeks to create a custom "synthetic" match that specifically mimics Store 109’s unique trajectory.
+* __Frisch-Waugh-Lovell (FWL) Theorem:__ The impact of prices and promotions were addressed by "regressing them out" before performing the causal estimation. This isolation of the marketing effect significantly improved precision, reducing standard errors for Product 1 from 18.50 (Simple DID) to 3.47 (Adjusted SDID).
+* __Two-Way Fixed Effects:__ By including store and time fixed effects, we controlled for all stable store characteristics and national-level shocks (like holidays), solving the endogeneity problem for any factors that are either subject-invariant or time-invariant.
