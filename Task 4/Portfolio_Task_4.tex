@@ -226,7 +226,8 @@
   \FunctionTok{mutate}\NormalTok{(}
     \CommentTok{\# \textquotesingle{}post\_treatment\textquotesingle{} is 1 for the weeks after the marketing strategy started}
     \AttributeTok{post\_treatment =} \FunctionTok{ifelse}\NormalTok{(Weekind }\SpecialCharTok{\textgreater{}=} \DecValTok{78}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{),}
-    \CommentTok{\# \textquotesingle{}treated\textquotesingle{} is the actual interaction / DiD term (1 ONLY for Store 109 AND Weekind \textgreater{}= 78)}
+    \CommentTok{\# \textquotesingle{}treated\textquotesingle{} is the actual interaction / DiD term }
+    \CommentTok{\# (1 ONLY for Store 109 AND Weekind \textgreater{}= 78)}
     \AttributeTok{treated =} \FunctionTok{ifelse}\NormalTok{(storeNum }\SpecialCharTok{==} \DecValTok{109} \SpecialCharTok{\&}\NormalTok{ Weekind }\SpecialCharTok{\textgreater{}=} \DecValTok{78}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{),}
     \CommentTok{\# Variable identifying the treated store (regardless of time)}
     \AttributeTok{is\_treated\_store =} \FunctionTok{ifelse}\NormalTok{(storeNum }\SpecialCharTok{==} \DecValTok{109}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)}
@@ -446,18 +447,30 @@ methods or be cautious in interpreting our results.
 \CommentTok{\# Aggregate average sales per week for treated vs control stores}
 \NormalTok{trend\_data\_p1 }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{group\_by}\NormalTok{(Weekind, is\_treated\_store) }\SpecialCharTok{\%\textgreater{}\%}
-  \FunctionTok{summarise}\NormalTok{(}\AttributeTok{mean\_sales =} \FunctionTok{mean}\NormalTok{(p1sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{), }\AttributeTok{.groups =} \StringTok{\textquotesingle{}drop\textquotesingle{}}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
-  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{, }\StringTok{"Treated (Store 109)"}\NormalTok{, }\StringTok{"Control (Other Stores)"}\NormalTok{))}
+  \FunctionTok{summarise}\NormalTok{(}\AttributeTok{mean\_sales =} \FunctionTok{mean}\NormalTok{(p1sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+            \AttributeTok{.groups =} \StringTok{\textquotesingle{}drop\textquotesingle{}}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{, }
+                        \StringTok{"Treated (Store 109)"}\NormalTok{, }
+                        \StringTok{"Control (Other Stores)"}\NormalTok{))}
 
-\NormalTok{plot\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p1, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind, }\AttributeTok{y =}\NormalTok{ mean\_sales, }\AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }\AttributeTok{x =} \DecValTok{76}\NormalTok{, }\AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p1}\SpecialCharTok{$}\NormalTok{mean\_sales), }
-           \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }\AttributeTok{angle =} \DecValTok{90}\NormalTok{, }\AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 1: Sales Trends (Treated vs Control)"}\NormalTok{,}
-       \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
-       \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{plot\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p1,}
+                  \FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind, }\AttributeTok{y =}\NormalTok{ mean\_sales, }\AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{, }
+                      \AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }
+                      \AttributeTok{color =} \StringTok{"red"}\NormalTok{, }
+                      \AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }
+                    \AttributeTok{x =} \DecValTok{76}\NormalTok{, }
+                    \AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p1}\SpecialCharTok{$}\NormalTok{mean\_sales), }
+                    \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }
+                    \AttributeTok{angle =} \DecValTok{90}\NormalTok{, }
+                    \AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }
+                    \AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 1: Sales Trends (Treated vs Control)"}\NormalTok{,}
+                \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
+                \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{theme\_minimal}\NormalTok{()}
 
 \FunctionTok{print}\NormalTok{(plot\_p1)}
 \end{Highlighting}
@@ -471,17 +484,29 @@ methods or be cautious in interpreting our results.
 \NormalTok{trend\_data\_p2 }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{group\_by}\NormalTok{(Weekind, is\_treated\_store) }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{summarise}\NormalTok{(}\AttributeTok{mean\_sales =} \FunctionTok{mean}\NormalTok{(p2sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{), }\AttributeTok{.groups =} \StringTok{\textquotesingle{}drop\textquotesingle{}}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
-  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{, }\StringTok{"Treated (Store 109)"}\NormalTok{, }\StringTok{"Control (Other Stores)"}\NormalTok{))}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{,}
+                        \StringTok{"Treated (Store 109)"}\NormalTok{,}
+                        \StringTok{"Control (Other Stores)"}\NormalTok{))}
 
-\NormalTok{plot\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p2, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind, }\AttributeTok{y =}\NormalTok{ mean\_sales, }\AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
-  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }\AttributeTok{x =} \DecValTok{76}\NormalTok{, }\AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p2}\SpecialCharTok{$}\NormalTok{mean\_sales), }
-           \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }\AttributeTok{angle =} \DecValTok{90}\NormalTok{, }\AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 2: Sales Trends (Treated vs Control)"}\NormalTok{,}
-       \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
-       \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
-  \FunctionTok{theme\_minimal}\NormalTok{()}
+\NormalTok{plot\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p2, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind,}
+                                     \AttributeTok{y =}\NormalTok{ mean\_sales, }
+                                     \AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{,}
+                      \AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }
+                      \AttributeTok{color =} \StringTok{"red"}\NormalTok{, }
+                      \AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }
+                    \AttributeTok{x =} \DecValTok{76}\NormalTok{, }
+                    \AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p2}\SpecialCharTok{$}\NormalTok{mean\_sales), }
+                    \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }
+                    \AttributeTok{angle =} \DecValTok{90}\NormalTok{, }
+                    \AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }
+                    \AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 2: Sales Trends (Treated vs Control)"}\NormalTok{,}
+                \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
+                \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{theme\_minimal}\NormalTok{()}
 
 \FunctionTok{print}\NormalTok{(plot\_p2)}
 \end{Highlighting}
@@ -554,7 +579,7 @@ product}\label{evaluating-the-treatment-effect-using-did-sc-and-sdid-methods-for
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# Ensure data frame is standard class (synthdid prefers plain data.frames over tibbles)}
+\CommentTok{\# Ensure data frame is standard (synthdid prefers plain data.frames over tibbles)}
 \NormalTok{df }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(df)}
 
 \CommentTok{\# Setup panel matrices for Product 1}
@@ -665,7 +690,7 @@ each product.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# Helper: extract synthetic counterfactual + RMSPE + donor weights from an SC estimate}
+\CommentTok{\# Extract synthetic counterfactual + RMSPE + donor weights from an SC estimate}
 \NormalTok{sc\_diagnostics }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(sc\_est, setup) \{}
 \NormalTok{  Y  }\OtherTok{\textless{}{-}}\NormalTok{ setup}\SpecialCharTok{$}\NormalTok{Y}
 \NormalTok{  N0 }\OtherTok{\textless{}{-}}\NormalTok{ setup}\SpecialCharTok{$}\NormalTok{N0}
@@ -673,7 +698,7 @@ each product.
 \NormalTok{  N  }\OtherTok{\textless{}{-}} \FunctionTok{nrow}\NormalTok{(Y)}
 \NormalTok{  T\_ }\OtherTok{\textless{}{-}} \FunctionTok{ncol}\NormalTok{(Y)}
 
-  \CommentTok{\# SC donor weights (length N0): synthetic counterfactual is weighted avg of controls}
+  \CommentTok{\# SC donor weights: synthetic counterfactual is weighted avg of controls}
 \NormalTok{  omega }\OtherTok{\textless{}{-}} \FunctionTok{attr}\NormalTok{(sc\_est, }\StringTok{"weights"}\NormalTok{)}\SpecialCharTok{$}\NormalTok{omega}
 
   \CommentTok{\# Synthetic counterfactual time series for the treated unit}
@@ -795,7 +820,7 @@ Two possible expansions to the analysis include:
   This estimates the same DiD effect --- the coefficient on the treated
   × post interaction --- and lets us see how much of the store-level
   variation the covariate set captures relative to the TWFE
-  specification (the brief's ``panel DID'').
+  specification.
 \item
   Implementing a version of the SDID method that first regresses out the
   effects of price and promotions (using the Frisch-Waugh-Lovell
@@ -813,11 +838,8 @@ within-transformation:
 \(Y_{it} = \alpha + \gamma\, T_i + \lambda\, POST_t + \delta\, (T_i \cdot POST_t) + X\beta + \varepsilon_{it}\),
 with \texttt{treated} as the interaction term. With explicit covariates
 instead of fixed effects, we can see how much of the store-level
-variation the covariate set captures relative to TWFE --- useful for
-judging whether the included covariates do the work fixed effects would
-otherwise do. The brief's ``panel DID'' is the TWFE specification above;
-this pooled-OLS form is the canonical Regression DiD (Angrist \& Pischke
-2009, Ch. 5; lecture 11) augmented with covariates.
+variation the covariate set captures relative to TWFE (Angrist \&
+Pischke 2009, Ch. 5; lecture 11).
 
 \subsubsection{Product 1: Pooled DiD with
 covariates}\label{product-1-pooled-did-with-covariates}
@@ -840,7 +862,10 @@ treated 29.97353   2.528654 11.85355 1.874956e-31
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Product 1: Pooled DiD with Clustered Standard Errors (treatment row)}
-\FunctionTok{coeftest}\NormalTok{(did\_cov\_p1, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p1, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))[}\StringTok{"treated"}\NormalTok{, , drop }\OtherTok{=} \ConstantTok{FALSE}\NormalTok{]}
+\FunctionTok{coeftest}\NormalTok{(did\_cov\_p1,}
+         \AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p1,}
+         \AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }
+         \AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))[}\StringTok{"treated"}\NormalTok{, , drop }\OtherTok{=} \ConstantTok{FALSE}\NormalTok{]}
 \end{Highlighting}
 \end{Shaded}
 
@@ -870,7 +895,10 @@ treated -34.35383   3.060016 -11.22668 1.799889e-28
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Product 2: Pooled DiD with Clustered Standard Errors (treatment row)}
-\FunctionTok{coeftest}\NormalTok{(did\_cov\_p2, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p2, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))[}\StringTok{"treated"}\NormalTok{, , drop }\OtherTok{=} \ConstantTok{FALSE}\NormalTok{]}
+\FunctionTok{coeftest}\NormalTok{(did\_cov\_p2, }
+         \AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p2,}
+         \AttributeTok{type =} \StringTok{"HC1"}\NormalTok{,}
+         \AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))[}\StringTok{"treated"}\NormalTok{, , drop }\OtherTok{=} \ConstantTok{FALSE}\NormalTok{]}
 \end{Highlighting}
 \end{Shaded}
 
@@ -898,7 +926,8 @@ interpretation on the same scale as the original sales volume.
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Run a linear model and extract the residuals (unexplained sales)}
-\NormalTok{model\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p1price }\SpecialCharTok{+}\NormalTok{ p1prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }\AttributeTok{data =}\NormalTok{ df)}
+\NormalTok{model\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p1price }\SpecialCharTok{+}\NormalTok{ p1prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize,}
+               \AttributeTok{data =}\NormalTok{ df)}
 \NormalTok{df}\SpecialCharTok{$}\NormalTok{p1sales\_adj }\OtherTok{\textless{}{-}} \FunctionTok{residuals}\NormalTok{(model\_p1) }\SpecialCharTok{+} \FunctionTok{mean}\NormalTok{(df}\SpecialCharTok{$}\NormalTok{p1sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
 
 \CommentTok{\# Setup panel matrices using the NEW adjusted outcome variable}
@@ -911,7 +940,9 @@ interpretation on the same scale as the original sales volume.
 \NormalTok{)}
 
 \CommentTok{\# Estimate the adjusted SDID Treatment Effect}
-\NormalTok{sdid\_est\_p1\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{Y, setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{N0, setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{sdid\_est\_p1\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{Y,}
+\NormalTok{                                     setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{N0,}
+\NormalTok{                                     setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{T0)}
 \FunctionTok{print}\NormalTok{(sdid\_est\_p1\_adj)}
 \end{Highlighting}
 \end{Shaded}
@@ -931,7 +962,7 @@ synthdid: 18.519 +- NA. Effective N0/N0 = 14.1/20~0.7. Effective T0/T0 = 1.6/77~
 \end{Shaded}
 
 \begin{verbatim}
-Adjusted 95% CI: [12.04, 25.00]
+Adjusted 95% CI: [11.19, 25.85]
 \end{verbatim}
 
 \begin{Shaded}
@@ -948,7 +979,8 @@ Adjusted 95% CI: [12.04, 25.00]
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Run a linear model and extract the residuals (unexplained sales)}
-\NormalTok{model\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p2price }\SpecialCharTok{+}\NormalTok{ p2prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }\AttributeTok{data =}\NormalTok{ df)}
+\NormalTok{model\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p2price }\SpecialCharTok{+}\NormalTok{ p2prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize,}
+               \AttributeTok{data =}\NormalTok{ df)}
 \NormalTok{df}\SpecialCharTok{$}\NormalTok{p2sales\_adj }\OtherTok{\textless{}{-}} \FunctionTok{residuals}\NormalTok{(model\_p2) }\SpecialCharTok{+} \FunctionTok{mean}\NormalTok{(df}\SpecialCharTok{$}\NormalTok{p2sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
 
 \CommentTok{\# Setup panel matrices using the NEW adjusted outcome variable}
@@ -961,7 +993,9 @@ Adjusted 95% CI: [12.04, 25.00]
 \NormalTok{)}
 
 \CommentTok{\# Estimate the adjusted SDID Treatment Effect}
-\NormalTok{sdid\_est\_p2\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{Y, setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{N0, setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{sdid\_est\_p2\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{Y,}
+\NormalTok{                                     setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{N0,}
+\NormalTok{                                      setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{T0)}
 \FunctionTok{print}\NormalTok{(sdid\_est\_p2\_adj)}
 \end{Highlighting}
 \end{Shaded}
@@ -981,7 +1015,7 @@ synthdid: -42.649 +- NA. Effective N0/N0 = 16.2/20~0.8. Effective T0/T0 = 4.2/77
 \end{Shaded}
 
 \begin{verbatim}
-Adjusted 95% CI: [-55.15, -30.14]
+Adjusted 95% CI: [-56.25, -29.05]
 \end{verbatim}
 
 \begin{Shaded}
@@ -1035,11 +1069,11 @@ P2 SE
 \endlastfoot
 Pre-Post (LM) & 33.69 & 1.71 & -29.71 & 1.87 \\
 Two-Way Fixed Effects (TWFE) & 29.98 & 4.03 & -34.29 & 4.45 \\
-Difference-in-Differences (DID) & 32.22 & 20.55 & -22.26 & 19.76 \\
+Difference-in-Differences (DID) & 32.22 & 20.86 & -22.26 & 21.71 \\
 Pooled DiD (with Covariates) & 29.97 & 4.04 & -34.35 & 4.46 \\
-Synthetic Control (SC) & 36.37 & 11.66 & -25.98 & 32.54 \\
-Synthetic DID (SDID) & 14.89 & 8.25 & -42.64 & 9.52 \\
-Adjusted SDID (with Covariates) & 18.52 & 3.82 & -42.65 & 6.41 \\
+Synthetic Control (SC) & 36.37 & 12.39 & -25.98 & 31.96 \\
+Synthetic DID (SDID) & 14.89 & 7.91 & -42.64 & 10.70 \\
+Adjusted SDID (with Covariates) & 18.52 & 3.15 & -42.65 & 6.69 \\
 \end{longtable}
 
 \subsection{Conclusions}\label{conclusions}

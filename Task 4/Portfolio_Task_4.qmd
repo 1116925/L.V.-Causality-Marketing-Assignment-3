@@ -36,7 +36,8 @@ df <- df %>%
   mutate(
     # 'post_treatment' is 1 for the weeks after the marketing strategy started
     post_treatment = ifelse(Weekind >= 78, 1, 0),
-    # 'treated' is the actual interaction / DiD term (1 ONLY for Store 109 AND Weekind >= 78)
+    # 'treated' is the actual interaction / DiD term 
+    # (1 ONLY for Store 109 AND Weekind >= 78)
     treated = ifelse(storeNum == 109 & Weekind >= 78, 1, 0),
     # Variable identifying the treated store (regardless of time)
     is_treated_store = ifelse(storeNum == 109, 1, 0)
@@ -116,18 +117,30 @@ Ideally, the treated store's sales should follow a similar trajectory to the con
 # Aggregate average sales per week for treated vs control stores
 trend_data_p1 <- df %>%
   group_by(Weekind, is_treated_store) %>%
-  summarise(mean_sales = mean(p1sales, na.rm = TRUE), .groups = 'drop') %>%
-  mutate(Group = ifelse(is_treated_store == 1, "Treated (Store 109)", "Control (Other Stores)"))
+  summarise(mean_sales = mean(p1sales, na.rm = TRUE),
+            .groups = 'drop') %>%
+  mutate(Group = ifelse(is_treated_store == 1, 
+                        "Treated (Store 109)", 
+                        "Control (Other Stores)"))
 
-plot_p1 <- ggplot(trend_data_p1, aes(x = Weekind, y = mean_sales, color = Group)) +
-  geom_line(linewidth = 1) +
-  geom_vline(xintercept = 78, linetype = "dashed", color = "red", linewidth = 1) +
-  annotate("text", x = 76, y = max(trend_data_p1$mean_sales), 
-           label = "Treatment Start", angle = 90, vjust = 1.5, color = "red") +
-  labs(title = "Product 1: Sales Trends (Treated vs Control)",
-       x = "Week Index",
-       y = "Average Weekly Sales") +
-  theme_minimal()
+plot_p1 <- ggplot(trend_data_p1,
+                  aes(x = Weekind, y = mean_sales, color = Group)) +
+           geom_line(linewidth = 1) +
+           geom_vline(xintercept = 78, 
+                      linetype = "dashed", 
+                      color = "red", 
+                      linewidth = 1) +
+           annotate("text", 
+                    x = 76, 
+                    y = max(trend_data_p1$mean_sales), 
+                    label = "Treatment Start", 
+                    angle = 90, 
+                    vjust = 1.5, 
+                    color = "red") +
+           labs(title = "Product 1: Sales Trends (Treated vs Control)",
+                x = "Week Index",
+                y = "Average Weekly Sales") +
+           theme_minimal()
 
 print(plot_p1)
 
@@ -135,17 +148,29 @@ print(plot_p1)
 trend_data_p2 <- df %>%
   group_by(Weekind, is_treated_store) %>%
   summarise(mean_sales = mean(p2sales, na.rm = TRUE), .groups = 'drop') %>%
-  mutate(Group = ifelse(is_treated_store == 1, "Treated (Store 109)", "Control (Other Stores)"))
+  mutate(Group = ifelse(is_treated_store == 1,
+                        "Treated (Store 109)",
+                        "Control (Other Stores)"))
 
-plot_p2 <- ggplot(trend_data_p2, aes(x = Weekind, y = mean_sales, color = Group)) +
-  geom_line(linewidth = 1) +
-  geom_vline(xintercept = 78, linetype = "dashed", color = "red", linewidth = 1) +
-  annotate("text", x = 76, y = max(trend_data_p2$mean_sales), 
-           label = "Treatment Start", angle = 90, vjust = 1.5, color = "red") +
-  labs(title = "Product 2: Sales Trends (Treated vs Control)",
-       x = "Week Index",
-       y = "Average Weekly Sales") +
-  theme_minimal()
+plot_p2 <- ggplot(trend_data_p2, aes(x = Weekind,
+                                     y = mean_sales, 
+                                     color = Group)) +
+           geom_line(linewidth = 1) +
+           geom_vline(xintercept = 78,
+                      linetype = "dashed", 
+                      color = "red", 
+                      linewidth = 1) +
+           annotate("text", 
+                    x = 76, 
+                    y = max(trend_data_p2$mean_sales), 
+                    label = "Treatment Start", 
+                    angle = 90, 
+                    vjust = 1.5, 
+                    color = "red") +
+           labs(title = "Product 2: Sales Trends (Treated vs Control)",
+                x = "Week Index",
+                y = "Average Weekly Sales") +
+           theme_minimal()
 
 print(plot_p2)
 ```
@@ -175,7 +200,7 @@ For both products, the visual interpretation leads to believe that there is a sl
 ```{r}
 #| label: DiD, SC, and SDID analyses for Product 1
 
-# Ensure data frame is standard class (synthdid prefers plain data.frames over tibbles)
+# Ensure data frame is standard (synthdid prefers plain data.frames over tibbles)
 df <- as.data.frame(df)
 
 # Setup panel matrices for Product 1
@@ -239,7 +264,7 @@ The two tables below report the standard SC diagnostics. Pre-RMSPE measures how 
 #| label: SC diagnostics — pre/post RMSPE and donor weights
 #| message: false
 
-# Helper: extract synthetic counterfactual + RMSPE + donor weights from an SC estimate
+# Extract synthetic counterfactual + RMSPE + donor weights from an SC estimate
 sc_diagnostics <- function(sc_est, setup) {
   Y  <- setup$Y
   N0 <- setup$N0
@@ -247,7 +272,7 @@ sc_diagnostics <- function(sc_est, setup) {
   N  <- nrow(Y)
   T_ <- ncol(Y)
 
-  # SC donor weights (length N0): synthetic counterfactual is weighted avg of controls
+  # SC donor weights: synthetic counterfactual is weighted avg of controls
   omega <- attr(sc_est, "weights")$omega
 
   # Synthetic counterfactual time series for the treated unit
@@ -328,11 +353,11 @@ kable(donors_p2,
 # Expensions to the analysis
 Two possible expansions to the analysis include:
 
-1. Running the same DiD interaction estimated via pooled OLS rather than within-transformation, with the full covariate set added explicitly. This estimates the same DiD effect — the coefficient on the treated × post interaction — and lets us see how much of the store-level variation the covariate set captures relative to the TWFE specification (the brief's "panel DID").
+1. Running the same DiD interaction estimated via pooled OLS rather than within-transformation, with the full covariate set added explicitly. This estimates the same DiD effect — the coefficient on the treated × post interaction — and lets us see how much of the store-level variation the covariate set captures relative to the TWFE specification.
 2. Implementing a version of the SDID method that first regresses out the effects of price and promotions (using the Frisch-Waugh-Lovell theorem) before applying the SDID estimator to the residuals. This will allow us to see how controlling for these covariates in a more flexible way (without assuming linearity or additivity) affects the estimates and their precision.
 
 ## Pooled DiD with covariates
-This is the same DiD effect estimated via pooled OLS rather than within-transformation: $Y_{it} = \alpha + \gamma\, T_i + \lambda\, POST_t + \delta\, (T_i \cdot POST_t) + X\beta + \varepsilon_{it}$, with `treated` as the interaction term. With explicit covariates instead of fixed effects, we can see how much of the store-level variation the covariate set captures relative to TWFE — useful for judging whether the included covariates do the work fixed effects would otherwise do. The brief's "panel DID" is the TWFE specification above; this pooled-OLS form is the canonical Regression DiD (Angrist & Pischke 2009, Ch. 5; lecture 11) augmented with covariates.
+This is the same DiD effect estimated via pooled OLS rather than within-transformation: $Y_{it} = \alpha + \gamma\, T_i + \lambda\, POST_t + \delta\, (T_i \cdot POST_t) + X\beta + \varepsilon_{it}$, with `treated` as the interaction term. With explicit covariates instead of fixed effects, we can see how much of the store-level variation the covariate set captures relative to TWFE (Angrist & Pischke 2009, Ch. 5; lecture 11).
 
 ### Product 1: Pooled DiD with covariates
 ```{r}
@@ -344,7 +369,10 @@ did_cov_p1 <- plm(p1sales ~ is_treated_store + post_treatment + treated +
 coeftest(did_cov_p1)["treated", , drop = FALSE]
 
 # Product 1: Pooled DiD with Clustered Standard Errors (treatment row)
-coeftest(did_cov_p1, vcov = vcovHC(did_cov_p1, type = "HC1", cluster = "group"))["treated", , drop = FALSE]
+coeftest(did_cov_p1,
+         vcov = vcovHC(did_cov_p1,
+         type = "HC1", 
+         cluster = "group"))["treated", , drop = FALSE]
 ```
 
 ### Product 2: Pooled DiD with covariates
@@ -357,7 +385,10 @@ did_cov_p2 <- plm(p2sales ~ is_treated_store + post_treatment + treated +
 coeftest(did_cov_p2)["treated", , drop = FALSE]
 
 # Product 2: Pooled DiD with Clustered Standard Errors (treatment row)
-coeftest(did_cov_p2, vcov = vcovHC(did_cov_p2, type = "HC1", cluster = "group"))["treated", , drop = FALSE]
+coeftest(did_cov_p2, 
+         vcov = vcovHC(did_cov_p2,
+         type = "HC1",
+         cluster = "group"))["treated", , drop = FALSE]
 ```
 
 ## Synthetic DiD regressing out the covariates
@@ -370,7 +401,8 @@ By adding the overall mean back to the residuals, we keep the interpretation on 
 #| label: Regressing out covariates for Product 1
 
 # Run a linear model and extract the residuals (unexplained sales)
-model_p1 <- lm(p1sales ~ p1price + p1prom + compind + storesize + citysize, data = df)
+model_p1 <- lm(p1sales ~ p1price + p1prom + compind + storesize + citysize,
+               data = df)
 df$p1sales_adj <- residuals(model_p1) + mean(df$p1sales, na.rm = TRUE)
 
 # Setup panel matrices using the NEW adjusted outcome variable
@@ -383,7 +415,9 @@ setup_p1_adj <- panel.matrices(
 )
 
 # Estimate the adjusted SDID Treatment Effect
-sdid_est_p1_adj <- synthdid_estimate(setup_p1_adj$Y, setup_p1_adj$N0, setup_p1_adj$T0)
+sdid_est_p1_adj <- synthdid_estimate(setup_p1_adj$Y,
+                                     setup_p1_adj$N0,
+                                     setup_p1_adj$T0)
 print(sdid_est_p1_adj)
 
 # Calculate and print confidence intervals for Product 1
@@ -401,7 +435,8 @@ plot(sdid_est_p1_adj) + theme_minimal() + ylab("residual sales + grand mean")
 #| label: Regressing out covariates for Product 2
 
 # Run a linear model and extract the residuals (unexplained sales)
-model_p2 <- lm(p2sales ~ p2price + p2prom + compind + storesize + citysize, data = df)
+model_p2 <- lm(p2sales ~ p2price + p2prom + compind + storesize + citysize,
+               data = df)
 df$p2sales_adj <- residuals(model_p2) + mean(df$p2sales, na.rm = TRUE)
 
 # Setup panel matrices using the NEW adjusted outcome variable
@@ -414,7 +449,9 @@ setup_p2_adj <- panel.matrices(
 )
 
 # Estimate the adjusted SDID Treatment Effect
-sdid_est_p2_adj <- synthdid_estimate(setup_p2_adj$Y, setup_p2_adj$N0, setup_p2_adj$T0)
+sdid_est_p2_adj <- synthdid_estimate(setup_p2_adj$Y,
+                                     setup_p2_adj$N0,
+                                      setup_p2_adj$T0)
 print(sdid_est_p2_adj)
 
 # Calculate and print confidence intervals for Product 2
@@ -435,11 +472,23 @@ plot(sdid_est_p2_adj) + theme_minimal() + ylab("residual sales + grand mean")
 
 # 1. Extract robust standard errors from the TWFE and Pooled DiD models
 # (We run coeftest again here to easily extract the values)
-robust_twfe_p1 <- coeftest(twfe_p1, vcov = vcovHC(twfe_p1, type = "HC1", cluster = "group"))
-robust_twfe_p2 <- coeftest(twfe_p2, vcov = vcovHC(twfe_p2, type = "HC1", cluster = "group"))
+robust_twfe_p1 <- coeftest(twfe_p1,
+                           vcov = vcovHC(twfe_p1,
+                                         type = "HC1",
+                                         cluster = "group"))
+robust_twfe_p2 <- coeftest(twfe_p2,
+                           vcov = vcovHC(twfe_p2,
+                                         type = "HC1",
+                                         cluster = "group"))
 
-robust_did_cov_p1 <- coeftest(did_cov_p1, vcov = vcovHC(did_cov_p1, type = "HC1", cluster = "group"))
-robust_did_cov_p2 <- coeftest(did_cov_p2, vcov = vcovHC(did_cov_p2, type = "HC1", cluster = "group"))
+robust_did_cov_p1 <- coeftest(did_cov_p1,
+                              vcov = vcovHC(did_cov_p1,
+                                            type = "HC1",
+                                            cluster = "group"))
+robust_did_cov_p2 <- coeftest(did_cov_p2,
+                              vcov = vcovHC(did_cov_p2,
+                                            type = "HC1",
+                                            cluster = "group"))
 
 # 2. Create a consolidated data frame with Estimates and Standard Errors (SE)
 results_summary <- data.frame(
