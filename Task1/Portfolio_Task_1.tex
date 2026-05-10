@@ -1,0 +1,859 @@
+% Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+  letterpaper,
+  DIV=11,
+  numbers=noendperiod]{scrartcl}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{5}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+% Make \paragraph and \subparagraph free-standing
+\makeatletter
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}{
+    \@ifstar
+      \xxxParagraphStar
+      \xxxParagraphNoStar
+  }
+  \newcommand{\xxxParagraphStar}[1]{\oldparagraph*{#1}\mbox{}}
+  \newcommand{\xxxParagraphNoStar}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}{
+    \@ifstar
+      \xxxSubParagraphStar
+      \xxxSubParagraphNoStar
+  }
+  \newcommand{\xxxSubParagraphStar}[1]{\oldsubparagraph*{#1}\mbox{}}
+  \newcommand{\xxxSubParagraphNoStar}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+\makeatother
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{241,243,245}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.40,0.45,0.13}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\ExtensionTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.07,0.07,0.07}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+
+
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+ 
+
+
+\KOMAoption{captions}{tableheading}
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\AtBeginDocument{%
+\ifdefined\contentsname
+  \renewcommand*\contentsname{Table of contents}
+\else
+  \newcommand\contentsname{Table of contents}
+\fi
+\ifdefined\listfigurename
+  \renewcommand*\listfigurename{List of Figures}
+\else
+  \newcommand\listfigurename{List of Figures}
+\fi
+\ifdefined\listtablename
+  \renewcommand*\listtablename{List of Tables}
+\else
+  \newcommand\listtablename{List of Tables}
+\fi
+\ifdefined\figurename
+  \renewcommand*\figurename{Figure}
+\else
+  \newcommand\figurename{Figure}
+\fi
+\ifdefined\tablename
+  \renewcommand*\tablename{Table}
+\else
+  \newcommand\tablename{Table}
+\fi
+}
+\@ifpackageloaded{float}{}{\usepackage{float}}
+\floatstyle{ruled}
+\@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
+\floatname{codelisting}{Listing}
+\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\makeatother
+\makeatletter
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
+\makeatother
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={GRA4158 Marketing - Analysis of Experiments, Portfolio 1},
+  pdfauthor={Vilijam Cekov, Luiz Felipe De Souza Simao},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+
+\title{GRA4158 Marketing - Analysis of Experiments, Portfolio 1}
+\author{Vilijam Cekov, Luiz Felipe De Souza Simao}
+\date{}
+\begin{document}
+\maketitle
+
+\renewcommand*\contentsname{Table of contents}
+{
+\hypersetup{linkcolor=}
+\setcounter{tocdepth}{3}
+\tableofcontents
+}
+
+\section{Introduction}\label{introduction}
+
+This report analyzes a Ghost-Ads advertising experiment designed to
+estimate whether ad exposure increases purchase probability. Because the
+design has one-sided non-compliance, the main estimand is the effect for
+users the ad-serving algorithm actually reaches. We estimate it two
+ways, using both a Wald/2SLS LATE and a direct Ghost-Ads ATET check,
+then look at impression-level heterogeneity and profitability with
+uncertainty around the cost calculation. The main pattern is that the
+effect is close to zero for users with three impressions or fewer, while
+most of the measured lift comes from the higher-impression bins.
+
+\section{Import Data}\label{import-data}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"CaseData2026.csv"}\NormalTok{, }\AttributeTok{sep =} \StringTok{";"}\NormalTok{, }\AttributeTok{header =} \ConstantTok{TRUE}\NormalTok{,}
+                 \AttributeTok{stringsAsFactors =} \ConstantTok{FALSE}\NormalTok{)}
+\NormalTok{data}\SpecialCharTok{$}\NormalTok{Z }\OtherTok{\textless{}{-}}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{test}
+\NormalTok{data}\SpecialCharTok{$}\NormalTok{D }\OtherTok{\textless{}{-}} \FunctionTok{as.integer}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1} \SpecialCharTok{\&}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{impressions }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{)}
+\NormalTok{data}\SpecialCharTok{$}\NormalTok{Y }\OtherTok{\textless{}{-}}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{purchase}
+
+\CommentTok{\# Display the structure of the data to verify column names}
+\FunctionTok{str}\NormalTok{(data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+'data.frame':   50000 obs. of  7 variables:
+ $ test          : int  0 1 1 0 1 0 0 0 1 0 ...
+ $ purchase      : int  0 0 0 0 0 0 0 0 0 0 ...
+ $ impressions   : int  6 3 3 4 0 3 4 7 2 5 ...
+ $ impressions_mc: num  2.801 -0.199 -0.199 0.801 -3.199 ...
+ $ Z             : int  0 1 1 0 1 0 0 0 1 0 ...
+ $ D             : int  0 1 1 0 0 0 0 0 1 0 ...
+ $ Y             : int  0 0 0 0 0 0 0 0 0 0 ...
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Check the first few rows}
+\FunctionTok{head}\NormalTok{(data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+  test purchase impressions impressions_mc Z D Y
+1    0        0           6        2.80114 0 0 0
+2    1        0           3       -0.19886 1 1 0
+3    1        0           3       -0.19886 1 1 0
+4    0        0           4        0.80114 0 0 0
+5    1        0           0       -3.19886 1 0 0
+6    0        0           3       -0.19886 0 0 0
+\end{verbatim}
+
+\section{Experiment, notation, and
+non-compliance}\label{experiment-notation-and-non-compliance}
+
+The company ran a cookie-level randomised field experiment on 50,000
+website visitors. Treatment-group visitors were eligible to see the
+focal ad and control-group visitors were not. Under the Ghost-Ads
+design, the ad-serving algorithm runs for both arms, and for control
+users the company records how many times the ad \emph{would have been}
+shown (the ``ghost'' impressions). The point of doing this is to deal
+with divergent delivery: both arms get selected for exposure by the same
+algorithmic rule, so they are comparable in exposure potential.
+
+Let \(Z_i \in \{0,1\}\) be assignment, \(M_i\) be impressions (actual
+for \(Z=1\), ghost for \(Z=0\)), and \(Y_i \in \{0,1\}\) be purchase.
+Actual treatment \(D_i\) is 1 only when \(Z_i = 1\) and \(M_i > 0\),
+since control users never see the ad.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{compliance\_table }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(}
+  \FunctionTok{table}\NormalTok{(}\AttributeTok{Z =}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{Z, }\AttributeTok{D =}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{D)}
+\NormalTok{)}
+\NormalTok{compliance\_table}\SpecialCharTok{$}\NormalTok{share }\OtherTok{\textless{}{-}} \FunctionTok{with}\NormalTok{(compliance\_table,}
+\NormalTok{  Freq }\SpecialCharTok{/} \FunctionTok{ave}\NormalTok{(Freq, Z, }\AttributeTok{FUN =}\NormalTok{ sum))}
+\NormalTok{compliance\_table}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+  Z D  Freq     share
+1 0 0 24928 1.0000000
+2 1 0  5378 0.2145022
+3 0 1     0 0.0000000
+4 1 1 19694 0.7854978
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{balance }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{Z =} \FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{),}
+  \AttributeTok{mean\_impressions =} \FunctionTok{c}\NormalTok{(}\FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0}\NormalTok{]),}
+                       \FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1}\NormalTok{])),}
+  \AttributeTok{share\_impressions\_positive =} \FunctionTok{c}\NormalTok{(}\FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0}\NormalTok{] }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{),}
+                                 \FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1}\NormalTok{] }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{))}
+\NormalTok{)}
+\NormalTok{balance}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+  Z mean_impressions share_impressions_positive
+1 0         3.196967                  0.7840982
+2 1         3.200742                  0.7854978
+\end{verbatim}
+
+The compliance table shows the design is one-sided non-compliant: no
+control user gets the ad, but about 21.5\% of treated users never see
+it. The balance check looks fine. Average impressions and the share of
+users with positive impressions are essentially identical across \(Z\),
+so the algorithm is selecting the same kind of users on both sides,
+which is what Ghost Ads is supposed to deliver.
+
+The 21.5\% non-compliance here isn't users refusing the ad. It comes
+from how the ad-auction and delivery pipeline works: the company's bid
+lost to a higher competing one, the frequency cap was hit, pacing
+throttled delivery to spread budget across the day, or the user left
+before a candidate impression got served. So exposure depends on
+platform and market conditions rather than on the user's potential
+outcomes, conditional on the targeting covariates the algorithm itself
+uses.
+
+Formally, the design enforces
+
+\[
+\Pr(D_i = 1 \mid Z_i = 0) = 0,
+\]
+
+so there are no always-takers or defiers in the sample. Every unit is
+either a complier (\(D_i(1) = 1, D_i(0) = 0\)) or a never-taker
+(\(D_i(1) = 0, D_i(0) = 0\)) in the principal-strata typology. Compliers
+are the users the algorithm actually reaches, and never-takers are users
+it would in principle have reached but didn't on the day.
+
+The potential-outcomes framework gives us four causal estimands:
+
+\[
+\text{ATE}    = \mathbb{E}[Y_i(1) - Y_i(0)]
+\]
+
+\[
+\text{ATET}   = \mathbb{E}[Y_i(1) - Y_i(0) \mid D_i = 1]
+\]
+
+\[
+\text{LATE}   = \mathbb{E}[Y_i(1) - Y_i(0) \mid i \in \text{complier}]
+\]
+
+\[
+\text{ITT}_Y  = \mathbb{E}[Y_i(Z=1) - Y_i(Z=0)]
+\]
+
+ATET here is the same thing as the Average Treatment effect on the
+Treated (ATT) from the selection-on-observables literature, since both
+labels refer to the same conditional expectation. Under one-sided
+non-compliance the treated and complier subpopulations coincide, so ATET
+= LATE, and the Wald/2SLS estimator works on either of them. The
+population ATE is not identified in this design, since never-takers
+contribute no exposure variation and projecting the complier effect onto
+them would need a homogeneity assumption Ghost Ads has no way to test.
+So our main causal quantity is ATET/LATE.
+
+\section{Treatment effects}\label{treatment-effects}
+
+We report four quantities: \(\text{ITT}_Y\), the compliance rate
+\(\text{ITT}_D\), the Wald/2SLS \(\text{LATE}\), and a direct Ghost-Ads
+estimator of \(\text{ATET}\). The last one serves as a check on the
+Ghost-Ads identification assumptions, since it uses the ghost-impression
+information more directly than the Wald ratio.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{itt\_model }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(Y }\SpecialCharTok{\textasciitilde{}}\NormalTok{ Z, }\AttributeTok{data =}\NormalTok{ data)}
+\NormalTok{itt\_y  }\OtherTok{\textless{}{-}} \FunctionTok{coef}\NormalTok{(itt\_model)[[}\StringTok{"Z"}\NormalTok{]]}
+\NormalTok{itt\_se }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{vcov}\NormalTok{(itt\_model)[}\StringTok{"Z"}\NormalTok{,}\StringTok{"Z"}\NormalTok{])}
+
+\NormalTok{compliance\_rate }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{D[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1}\NormalTok{])}
+
+\CommentTok{\# 2SLS by hand (no AER needed): regress D on Z, form D{-}hat, regress Y on D{-}hat}
+\NormalTok{fs   }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(D }\SpecialCharTok{\textasciitilde{}}\NormalTok{ Z, }\AttributeTok{data =}\NormalTok{ data)}
+\NormalTok{dhat }\OtherTok{\textless{}{-}} \FunctionTok{fitted}\NormalTok{(fs)}
+\NormalTok{ss   }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(Y }\SpecialCharTok{\textasciitilde{}}\NormalTok{ dhat, }\AttributeTok{data =}\NormalTok{ data)}
+\NormalTok{late\_2sls }\OtherTok{\textless{}{-}} \FunctionTok{coef}\NormalTok{(ss)[[}\StringTok{"dhat"}\NormalTok{]]}
+
+\CommentTok{\# Delta{-}method SE for Wald LATE}
+\NormalTok{v\_itt\_d }\OtherTok{\textless{}{-}} \FunctionTok{vcov}\NormalTok{(}\FunctionTok{lm}\NormalTok{(D }\SpecialCharTok{\textasciitilde{}}\NormalTok{ Z, }\AttributeTok{data =}\NormalTok{ data))[}\StringTok{"Z"}\NormalTok{,}\StringTok{"Z"}\NormalTok{]}
+\NormalTok{late\_se }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{((}\DecValTok{1}\SpecialCharTok{/}\NormalTok{compliance\_rate)}\SpecialCharTok{\^{}}\DecValTok{2} \SpecialCharTok{*}\NormalTok{ itt\_se}\SpecialCharTok{\^{}}\DecValTok{2} \SpecialCharTok{+}
+\NormalTok{                (itt\_y }\SpecialCharTok{/}\NormalTok{ compliance\_rate}\SpecialCharTok{\^{}}\DecValTok{2}\NormalTok{)}\SpecialCharTok{\^{}}\DecValTok{2} \SpecialCharTok{*}\NormalTok{ v\_itt\_d)}
+
+\CommentTok{\# Direct ATET via Ghost{-}Ads counterfactual: exposed{-}treated vs ghost{-}exposed control}
+\NormalTok{yt }\OtherTok{\textless{}{-}}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{Y[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1} \SpecialCharTok{\&}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{impressions }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{]}
+\NormalTok{yc }\OtherTok{\textless{}{-}}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{Y[data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0} \SpecialCharTok{\&}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{impressions }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{]}
+\NormalTok{atet\_direct }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(yt) }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(yc)}
+\NormalTok{atet\_se     }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{var}\NormalTok{(yt)}\SpecialCharTok{/}\FunctionTok{length}\NormalTok{(yt) }\SpecialCharTok{+} \FunctionTok{var}\NormalTok{(yc)}\SpecialCharTok{/}\FunctionTok{length}\NormalTok{(yc))}
+
+\NormalTok{results }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{estimand =} \FunctionTok{c}\NormalTok{(}\StringTok{"ITT\_Y (assignment)"}\NormalTok{, }\StringTok{"Compliance rate"}\NormalTok{,}
+               \StringTok{"LATE (2SLS)"}\NormalTok{, }\StringTok{"ATET (direct, Ghost Ads)"}\NormalTok{),}
+  \AttributeTok{estimate =} \FunctionTok{c}\NormalTok{(itt\_y, compliance\_rate, late\_2sls, atet\_direct),}
+  \AttributeTok{se       =} \FunctionTok{c}\NormalTok{(itt\_se, }\ConstantTok{NA}\NormalTok{, late\_se, atet\_se)}
+\NormalTok{)}
+\NormalTok{results}\SpecialCharTok{$}\NormalTok{ci\_low  }\OtherTok{\textless{}{-}}\NormalTok{ results}\SpecialCharTok{$}\NormalTok{estimate }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ results}\SpecialCharTok{$}\NormalTok{se}
+\NormalTok{results}\SpecialCharTok{$}\NormalTok{ci\_high }\OtherTok{\textless{}{-}}\NormalTok{ results}\SpecialCharTok{$}\NormalTok{estimate }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ results}\SpecialCharTok{$}\NormalTok{se}
+\NormalTok{num }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(results, is.numeric)}
+\NormalTok{results[num] }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(results[num], round, }\DecValTok{6}\NormalTok{)}
+\NormalTok{results}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+                  estimand estimate       se   ci_low  ci_high
+1       ITT_Y (assignment) 0.004648 0.001433 0.001840 0.007456
+2          Compliance rate 0.785498       NA       NA       NA
+3              LATE (2SLS) 0.005918 0.001824 0.002342 0.009493
+4 ATET (direct, Ghost Ads) 0.005863 0.001818 0.002299 0.009427
+\end{verbatim}
+
+The Wald/2SLS LATE comes out at 0.59 pp (95\% CI 0.23-0.95) and the
+direct Ghost-Ads ATET is also 0.59 pp (95\% CI 0.23-0.94). They agree to
+four decimal places, which is the identification check we wanted: under
+Ghost Ads plus one-sided non-compliance, a plain mean comparison on
+exposed users should give the same answer as the IV-based LATE, and
+that's what we see. If the two had disagreed, we'd probably read that as
+residual divergent delivery or asymmetric ghost recording, but nothing
+like that is showing up here.
+
+ITT comes in at 0.47 pp, which is smaller than LATE because it averages
+over the 21.5\% of treated users who never saw the ad. For
+decision-making the relevant quantity is LATE/ATET (0.59 pp), which is
+the effect on the users the algorithm actually reaches.
+
+We don't estimate the population ATE. Compliers and never-takers are
+selected by the algorithm based on predicted engagement, so
+extrapolating LATE to the full population would need a homogeneity
+assumption we have no good reason to believe.
+
+\section{Heterogeneity in the treatment
+effect}\label{heterogeneity-in-the-treatment-effect}
+
+The first heterogeneity specification we fit is a linear interaction
+\(Y = \alpha + \beta Z + \gamma M + \omega (Z \cdot M) + \varepsilon\).
+It gives \(\hat\omega \approx 0.00351\), which looks like a positive
+dose-response. There are two concerns with reading this as the main
+heterogeneity result, and we work through them below.
+
+\subsection{The linear model is mechanically misspecified on this
+data}\label{the-linear-model-is-mechanically-misspecified-on-this-data}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{cate\_model }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(Y }\SpecialCharTok{\textasciitilde{}}\NormalTok{ Z }\SpecialCharTok{*}\NormalTok{ impressions, }\AttributeTok{data =}\NormalTok{ data)}
+\FunctionTok{round}\NormalTok{(}\FunctionTok{summary}\NormalTok{(cate\_model)}\SpecialCharTok{$}\NormalTok{coefficients, }\DecValTok{6}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+               Estimate Std. Error    t value Pr(>|t|)
+(Intercept)   -0.053303   0.001554 -34.309149 0.000000
+Z             -0.006665   0.002196  -3.035148 0.002405
+impressions    0.024189   0.000388  62.295067 0.000000
+Z:impressions  0.003506   0.000549   6.388522 0.000000
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{cc }\OtherTok{\textless{}{-}} \FunctionTok{coef}\NormalTok{(cate\_model)}
+\NormalTok{m\_grid }\OtherTok{\textless{}{-}} \DecValTok{0}\SpecialCharTok{:}\FunctionTok{max}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions)}
+\NormalTok{p1 }\OtherTok{\textless{}{-}}\NormalTok{ cc[[}\StringTok{"(Intercept)"}\NormalTok{]] }\SpecialCharTok{+}\NormalTok{ cc[[}\StringTok{"Z"}\NormalTok{]] }\SpecialCharTok{+}
+\NormalTok{      (cc[[}\StringTok{"impressions"}\NormalTok{]] }\SpecialCharTok{+}\NormalTok{ cc[[}\StringTok{"Z:impressions"}\NormalTok{]]) }\SpecialCharTok{*}\NormalTok{ m\_grid}
+\NormalTok{p0 }\OtherTok{\textless{}{-}}\NormalTok{ cc[[}\StringTok{"(Intercept)"}\NormalTok{]] }\SpecialCharTok{+}\NormalTok{ cc[[}\StringTok{"impressions"}\NormalTok{]] }\SpecialCharTok{*}\NormalTok{ m\_grid}
+
+\FunctionTok{range}\NormalTok{(p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] -0.05996857  0.41085406
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{range}\NormalTok{(p0)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] -0.05330345  0.35791598
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tau\_lin }\OtherTok{\textless{}{-}}\NormalTok{ p1 }\SpecialCharTok{{-}}\NormalTok{ p0}
+\FunctionTok{data.frame}\NormalTok{(}\AttributeTok{M =} \FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{5}\NormalTok{, }\DecValTok{10}\NormalTok{, }\DecValTok{17}\NormalTok{),}
+           \AttributeTok{tau\_linear =}\NormalTok{ tau\_lin[}\FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{5}\NormalTok{, }\DecValTok{10}\NormalTok{, }\DecValTok{17}\NormalTok{) }\SpecialCharTok{+} \DecValTok{1}\NormalTok{])}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+   M   tau_linear
+1  0 -0.006665128
+2  1 -0.003159057
+3  3  0.003853085
+4  5  0.010865226
+5 10  0.028395581
+6 17  0.052938077
+\end{verbatim}
+
+We see two problems with this specification:
+
+\begin{itemize}
+\tightlist
+\item
+  The fitted probabilities \(\hat p(Y=1 \mid Z, M)\) range from
+  \(-0.06\) to \(+0.41\). LPMs can fit outside \([0,1]\) in general,
+  which isn't a deal-breaker, but the excursion below zero is large
+  enough here to flag.
+\item
+  The implied conditional treatment effect at low impressions is
+  \emph{negative}: \(\hat\tau(M=0) = -0.0067\),
+  \(\hat\tau(M=1) = -0.0032\). That isn't a plausible dose-response. It
+  looks more like an artifact of forcing a linear shape on data whose
+  effect actually concentrates somewhere else.
+\end{itemize}
+
+There's also the question of whether linearity even makes sense as a
+shape for this data. The outcome is binary with a very low base
+conversion rate, the impression distribution is heavily right-skewed
+(most users see zero or a handful of impressions, only around 4\% see
+eight or more), and the small high-impression group has a baseline
+conversion of 54\%. A single linear slope \(\omega\) is being asked to
+fit all of those regions with one number, and most of the data sits at
+low impression counts where almost nobody is purchasing anyway. We did
+look at more flexible alternatives, including causal forests, GAMs, and
+kernel/local-linear regression on the moderator. With only one moderator
+(impressions) we don't really need the flexibility a forest gives us,
+and the high-impression bin is thin enough (about 4\% of the sample)
+that a smoother would give very wide confidence intervals exactly in the
+region where the bigger effect is showing up. Binning is also easier to
+translate into the profitability calculation in the next section, where
+we'd want bin-level estimates anyway.
+
+\subsection{Binned estimates tell a different
+story}\label{binned-estimates-tell-a-different-story}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{br }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\ConstantTok{Inf}\NormalTok{, }\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{7}\NormalTok{, }\DecValTok{15}\NormalTok{)}
+\NormalTok{lb }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"0"}\NormalTok{,}\StringTok{"1"}\NormalTok{,}\StringTok{"2{-}3"}\NormalTok{,}\StringTok{"4{-}7"}\NormalTok{,}\StringTok{"8{-}15"}\NormalTok{)}
+\NormalTok{data}\SpecialCharTok{$}\NormalTok{M\_bin }\OtherTok{\textless{}{-}} \FunctionTok{cut}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions, }\AttributeTok{breaks =}\NormalTok{ br, }\AttributeTok{labels =}\NormalTok{ lb, }\AttributeTok{right =} \ConstantTok{TRUE}\NormalTok{)}
+
+\NormalTok{per\_bin }\OtherTok{\textless{}{-}} \FunctionTok{do.call}\NormalTok{(rbind, }\FunctionTok{lapply}\NormalTok{(}\FunctionTok{levels}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{M\_bin), }\ControlFlowTok{function}\NormalTok{(b) \{}
+\NormalTok{  dd }\OtherTok{\textless{}{-}}\NormalTok{ data[data}\SpecialCharTok{$}\NormalTok{M\_bin }\SpecialCharTok{==}\NormalTok{ b, ]}
+\NormalTok{  y1 }\OtherTok{\textless{}{-}}\NormalTok{ dd}\SpecialCharTok{$}\NormalTok{Y[dd}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1}\NormalTok{]; y0 }\OtherTok{\textless{}{-}}\NormalTok{ dd}\SpecialCharTok{$}\NormalTok{Y[dd}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0}\NormalTok{]}
+\NormalTok{  n1 }\OtherTok{\textless{}{-}} \FunctionTok{length}\NormalTok{(y1); n0 }\OtherTok{\textless{}{-}} \FunctionTok{length}\NormalTok{(y0)}
+\NormalTok{  itt  }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(y1) }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(y0)}
+\NormalTok{  se   }\OtherTok{\textless{}{-}} \ControlFlowTok{if}\NormalTok{ (n1 }\SpecialCharTok{\textgreater{}} \DecValTok{1} \SpecialCharTok{\&\&}\NormalTok{ n0 }\SpecialCharTok{\textgreater{}} \DecValTok{1}\NormalTok{) }\FunctionTok{sqrt}\NormalTok{(}\FunctionTok{var}\NormalTok{(y1)}\SpecialCharTok{/}\NormalTok{n1 }\SpecialCharTok{+} \FunctionTok{var}\NormalTok{(y0)}\SpecialCharTok{/}\NormalTok{n0) }\ControlFlowTok{else} \ConstantTok{NA\_real\_}
+\NormalTok{  cmpl }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(dd}\SpecialCharTok{$}\NormalTok{D[dd}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1}\NormalTok{])}
+  \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{M\_bin =}\NormalTok{ b, }\AttributeTok{n1 =}\NormalTok{ n1, }\AttributeTok{n0 =}\NormalTok{ n0,}
+             \AttributeTok{y1 =} \FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(y1), }\DecValTok{5}\NormalTok{), }\AttributeTok{y0 =} \FunctionTok{round}\NormalTok{(}\FunctionTok{mean}\NormalTok{(y0), }\DecValTok{5}\NormalTok{),}
+             \AttributeTok{itt\_y =} \FunctionTok{round}\NormalTok{(itt, }\DecValTok{6}\NormalTok{), }\AttributeTok{se\_itt =} \FunctionTok{round}\NormalTok{(se, }\DecValTok{6}\NormalTok{),}
+             \AttributeTok{ci\_low  =} \FunctionTok{round}\NormalTok{(itt }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se, }\DecValTok{6}\NormalTok{),}
+             \AttributeTok{ci\_high =} \FunctionTok{round}\NormalTok{(itt }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se, }\DecValTok{6}\NormalTok{),}
+             \AttributeTok{comply  =} \FunctionTok{round}\NormalTok{(cmpl, }\DecValTok{4}\NormalTok{),}
+             \AttributeTok{late\_bin =} \FunctionTok{round}\NormalTok{(itt }\SpecialCharTok{/} \FunctionTok{max}\NormalTok{(cmpl, }\FloatTok{1e{-}9}\NormalTok{), }\DecValTok{6}\NormalTok{))}
+\NormalTok{\}))}
+\NormalTok{per\_bin}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+  M_bin    n1    n0 y1 y0 itt_y se_itt ci_low ci_high comply late_bin
+1     0  5379  5383 NA NA    NA     NA     NA      NA     NA       NA
+2     1  1453  1481 NA NA    NA     NA     NA      NA     NA       NA
+3   2-3  6925  6767 NA NA    NA     NA     NA      NA     NA       NA
+4   4-7 10289 10255 NA NA    NA     NA     NA      NA     NA       NA
+5  8-15  1031  1046 NA NA    NA     NA     NA      NA     NA       NA
+\end{verbatim}
+
+Looking at the binned estimates, the pattern is more like a threshold
+than a smooth slope. For users with at most three impressions (55\% of
+the sample) purchases are zero in both arms, so the effect in those bins
+is zero by construction. The 4-7 bin (41\% of the sample) gives 0.39 pp
+(95\% CI 0.19-0.58), and the 8-15 bin (4\% of the sample) jumps to 8.65
+pp (95\% CI 4.42-12.88).
+
+So the \(\hat\omega \approx 0.00351\) slope from the linear model isn't
+really a dose-response. It's averaging over three quite different
+groups: zero effect for the 0-3 group, a small effect for the 4-7 group,
+and a much larger one for the 8-15 group. The binning makes this much
+easier to see than the linear interaction did.
+
+Only one user in the sample sees more than 15 impressions, so the bins
+stop at 15 because the platform's frequency cap rules out higher counts,
+not because of anything we're learning about the response curve.
+
+\subsection{Algorithm-conditional
+interpretation}\label{algorithm-conditional-interpretation}
+
+One thing worth flagging is that we don't assign \(M\). It's the output
+of the platform's targeting and auction system, which concentrates
+higher impression counts on users with higher predicted engagement. The
+8-15 bin has a baseline conversion of 54\%, so these are users the
+algorithm was already going hard at. The 8.65 pp effect there therefore
+mixes two things: a causal effect of more exposure on a given user type,
+and a composition effect from the algorithm steering certain kinds of
+users into that bin.
+
+This is why a policy like \emph{``serve everyone 10 impressions''}
+doesn't move a user currently sitting at one impression to the effect we
+estimate at ten. It changes the targeting regime itself, which
+re-selects who ends up in each bin. So \(\tau(M)\) here is conditional
+on the observed ad-serving policy, not a structural dose-response.
+
+\section{Profitability with
+uncertainty}\label{profitability-with-uncertainty}
+
+A point estimate on its own doesn't really tell the manager how much to
+trust the number, so we want some uncertainty around the relevant
+quantities. Net contribution depends linearly on LATE, with the
+constants being the contribution per purchase and the cost per
+impression. Break-even contribution moves with LATE too, just
+monotonically rather than linearly. So once we have a CI for LATE we can
+push it through to both without doing any new estimation.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{contrib }\OtherTok{\textless{}{-}} \DecValTok{200}       \CommentTok{\# NOK per purchase}
+\NormalTok{cpi     }\OtherTok{\textless{}{-}} \DecValTok{100}\SpecialCharTok{/}\DecValTok{1000}  \CommentTok{\# NOK per impression}
+\NormalTok{avg\_imp }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions)}
+
+\CommentTok{\# Delta{-}method 95\% CI for LATE (late\_2sls and late\_se computed in Section 4)}
+\NormalTok{late\_low  }\OtherTok{\textless{}{-}}\NormalTok{ late\_2sls }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ late\_se}
+\NormalTok{late\_high }\OtherTok{\textless{}{-}}\NormalTok{ late\_2sls }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ late\_se}
+
+\CommentTok{\# Net contribution per user is linear in LATE:}
+\CommentTok{\#   net = LATE * contrib {-} avg\_imp * cpi}
+\NormalTok{net\_point }\OtherTok{\textless{}{-}}\NormalTok{ late\_2sls }\SpecialCharTok{*}\NormalTok{ contrib }\SpecialCharTok{{-}}\NormalTok{ avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi}
+\NormalTok{net\_low   }\OtherTok{\textless{}{-}}\NormalTok{ late\_low  }\SpecialCharTok{*}\NormalTok{ contrib }\SpecialCharTok{{-}}\NormalTok{ avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi}
+\NormalTok{net\_high  }\OtherTok{\textless{}{-}}\NormalTok{ late\_high }\SpecialCharTok{*}\NormalTok{ contrib }\SpecialCharTok{{-}}\NormalTok{ avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi}
+
+\CommentTok{\# Break{-}even contribution = (avg\_imp * cpi) / LATE  (monotone decreasing in LATE)}
+\NormalTok{be\_contrib\_point }\OtherTok{\textless{}{-}}\NormalTok{ (avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi) }\SpecialCharTok{/}\NormalTok{ late\_2sls}
+\NormalTok{be\_contrib\_low   }\OtherTok{\textless{}{-}}\NormalTok{ (avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi) }\SpecialCharTok{/}\NormalTok{ late\_high   }\CommentTok{\# smallest BE at largest LATE}
+\NormalTok{be\_contrib\_high  }\OtherTok{\textless{}{-}}\NormalTok{ (avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi) }\SpecialCharTok{/}\NormalTok{ late\_low    }\CommentTok{\# largest  BE at smallest LATE}
+
+\CommentTok{\# Break{-}even LATE = (avg\_imp * cpi) / contrib  (constant, no CI)}
+\NormalTok{be\_late }\OtherTok{\textless{}{-}}\NormalTok{ (avg\_imp }\SpecialCharTok{*}\NormalTok{ cpi) }\SpecialCharTok{/}\NormalTok{ contrib}
+
+\NormalTok{profit\_table }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{quantity =} \FunctionTok{c}\NormalTok{(}\StringTok{"LATE"}\NormalTok{,}
+               \StringTok{"Avg impressions per user"}\NormalTok{,}
+               \StringTok{"Net contribution per user (NOK)"}\NormalTok{,}
+               \StringTok{"Break{-}even contribution (NOK)"}\NormalTok{,}
+               \StringTok{"Break{-}even LATE"}\NormalTok{),}
+  \AttributeTok{point    =} \FunctionTok{c}\NormalTok{(late\_2sls, avg\_imp, net\_point, be\_contrib\_point, be\_late),}
+  \AttributeTok{ci\_low   =} \FunctionTok{c}\NormalTok{(late\_low,  }\ConstantTok{NA}\NormalTok{,      net\_low,   be\_contrib\_low,   }\ConstantTok{NA}\NormalTok{),}
+  \AttributeTok{ci\_high  =} \FunctionTok{c}\NormalTok{(late\_high, }\ConstantTok{NA}\NormalTok{,      net\_high,  be\_contrib\_high,  }\ConstantTok{NA}\NormalTok{)}
+\NormalTok{)}
+\NormalTok{profit\_table[ , }\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{] }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(profit\_table[ , }\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{], round, }\DecValTok{4}\NormalTok{)}
+\NormalTok{profit\_table}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+                         quantity   point  ci_low  ci_high
+1                            LATE  0.0059  0.0023   0.0095
+2        Avg impressions per user  3.1989      NA       NA
+3 Net contribution per user (NOK)  0.8636  0.1486   1.5787
+4   Break-even contribution (NOK) 54.0574 33.6975 136.5760
+5                 Break-even LATE  0.0016      NA       NA
+\end{verbatim}
+
+Net contribution comes out at \textbf{0.86 NOK per user} at the point
+estimate, with a 95\% delta-method CI of \textbf{{[}0.14, 1.58{]} NOK}
+from mapping the LATE bounds through
+\(\text{net} = \text{LATE} \times 200 - \bar M \times 0.10\).
+
+Break-even contribution is \textbf{54 NOK} at the point estimate.
+Mapping the LATE bounds through \((\bar M \times 0.10)/\text{LATE}\)
+gives a range of \textbf{34 NOK} (at the upper LATE bound) to
+\textbf{137 NOK} (at the lower bound). So the profitability call really
+only holds if we're confident contribution per purchase stays above
+roughly 137 NOK. A 31\% drop in contribution combined with unfavourable
+LATE estimation could flip the sign.
+
+Break-even LATE is 0.16 pp, well below our estimate of 0.59 pp (CI
+0.23-0.95). Most of the uncertainty in the profit number is coming from
+the LATE itself, not from the cost or contribution inputs.
+
+The bigger risk is the one in Section 5: almost all of the program
+contribution is coming from the 8-15 impressions bin. If the platform
+rebalances inventory and that group gets smaller or different, our
+average effect estimate could move with the change in composition.
+
+\section{Methods and inference}\label{methods-and-inference}
+
+We use the linear probability model throughout. Under random assignment,
+OLS on a binary outcome is unbiased for the average causal difference in
+probabilities, which is the quantity the manager actually wants.
+Logistic regression would give us odds ratios rather than risk
+differences, and the likelihood-fit improvement is tiny at conversion
+rates this close to zero, so the LPM is fine here.
+
+The LATE rests on the standard IV conditions, and they all line up
+reasonably well in this setting. Random assignment is given by the
+experimental design. Monotonicity is automatic under one-sided
+non-compliance, since no control user can take treatment in the first
+place, so there are no defiers to worry about. First-stage relevance is
+fine, with a compliance rate around 78.5\%. The exclusion restriction is
+the one we'd want to think about hardest, and on that front Ghost Ads
+helps a lot: control users have no way of knowing they're in an
+experiment, so there isn't a realistic channel for assignment to
+influence outcomes other than through actual exposure.
+
+Inference on the Wald LATE is via the delta method. The profitability
+bounds in Section 6 follow from that almost for free, since net
+contribution is linear in LATE and break-even contribution is monotone
+in it, so there's nothing to re-estimate.
+
+The CATE story in Section 5 has one limitation that no choice of
+estimator fixes: \(M\) is endogenous to the targeting algorithm. Within
+a given bin random assignment still holds, so each bin-level effect is
+causal for the population the algorithm put in that bin. Across bins,
+though, \(\hat\tau(M)\) isn't a dose-response --- the algorithm is the
+reason \(M\) varies in the first place.
+
+\section{Threats to causal
+identification}\label{threats-to-causal-identification}
+
+On SUTVA, the non-interference half looks fine. Randomisation is at the
+cookie level and ad delivery is individualised, so direct interference
+between users is hard to come by; the realistic spillover channels are
+word-of-mouth and shared devices, which should be small for this kind of
+campaign. If they aren't zero, the bias goes toward making some control
+users informally treated, which would attenuate our estimate rather than
+inflate it. The consistency half is the more interesting one. Users see
+different numbers of impressions, so exposure technically has multiple
+versions, but that only becomes a violation if we leave the variation
+unmodelled --- and we don't, since the heterogeneity analysis in Section
+5 is built around exactly that variation.
+
+The exclusion restriction is the assumption we keep coming back to,
+since the whole Wald LATE rests on it. Under Ghost Ads, the ad-serving
+algorithm runs for both arms and control users never learn they're part
+of an experiment, so assignment has no plausible route to outcomes
+except through actual exposure. The exclusion is as credible as the
+Ghost-Ads setup itself, and we think that setup is credible here.
+
+Measurement is the threat that's hardest to verify from inside the data.
+Outcomes are tracked via cookies, and if tracking attrition differs
+across arms --- different browser shares, different ad-blocker rates,
+different cookie-deletion rates --- the estimate could be biased in
+either direction. We have no concrete reason to suspect that's
+happening, but we also can't rule it out from what's in the file.
+
+External validity is the obvious limitation. The estimates are specific
+to this platform, this algorithm, this campaign, and this time window,
+and \(\tau(M)\) in particular shouldn't be carried over to a different
+targeting policy --- as we said in Section 5, the algorithm is itself
+half the reason the bin-level effects look the way they do.
+
+\section{Conclusion}\label{conclusion}
+
+Advertising raises the probability of purchase by 0.59 pp (95\% CI
+0.23-0.95) for the users the algorithm picks, with a net contribution of
+0.86 NOK per user (95\% CI 0.14-1.58). The effect isn't a smooth
+dose-response. It's close to zero below four impressions, and most of
+the program's contribution comes from the small 8-15 bin. We'd recommend
+keeping the campaign and the current algorithmic targeting, while
+watching the size of that high-impression group closely, since most of
+the profitability depends on it.
+
+\section{References}\label{references}
+
+Braun, M. and Schwartz, E. M. (2025). Where A/B testing goes wrong: how
+divergent delivery affects what online experiments cannot (and can)
+learn.
+
+Gordon, B. R., Zettelmeyer, F., Bhargava, N. and Chapsky, D. (2019). A
+comparison of approaches to advertising measurement: evidence from big
+field experiments at Facebook. \emph{Marketing Science}.
+
+Imbens, G. W. and Angrist, J. D. (1994). Identification and estimation
+of local average treatment effects. \emph{Econometrica}.
+
+Imbens, G. W. and Rubin, D. B. (2015). \emph{Causal Inference for
+Statistics, Social, and Biomedical Sciences}.
+
+Johnson, G. A., Lewis, R. A. and Nubbemeyer, E. I. (2017). Ghost ads:
+improving the economics of measuring online ad effectiveness.
+\emph{Journal of Marketing Research}.
+
+\section{Reflection on AI Use}\label{reflection-on-ai-use}
+
+We used AI tools at various points during this assignment, mainly in a
+supporting role rather than for generating the analysis or writing from
+scratch.
+
+\textbf{Tools used:} Primarily Google Gemini for code-related tasks, and
+NotebookLM for revisiting theoretical concepts from the course material.
+
+\textbf{What we used AI for:}
+
+\begin{itemize}
+\tightlist
+\item
+  Debugging code when we ran into errors or unexpected output, and
+  getting suggestions on how to improve code quality (e.g., setting up
+  the manual 2SLS, formulating the delta-method standard error for the
+  Wald LATE, and constructing the binned LATE table).
+\item
+  Checking for oversights in our analysis (essentially using it as a
+  second pair of eyes to see if we missed something obvious or made a
+  methodological mistake), especially when deciding to add the direct
+  Ghost-Ads ATET as a check against the 2SLS LATE.
+\item
+  Searching for information to refresh our understanding of the theory
+  behind the methods, particularly around one-sided non-compliance, the
+  LATE/ATET equivalence, and the mechanics of Ghost Ads.
+\item
+  NotebookLM was useful for going back over course readings and lecture
+  material to make sure we had the concepts right before writing up the
+  discussion, in particular the principal-strata typology and the
+  conditions for the IV exclusion restriction.
+\end{itemize}
+
+\textbf{How we handled AI input:} We treated AI suggestions as starting
+points rather than final answers. When it flagged something or suggested
+a change, we checked it against the course material and our own
+understanding before incorporating it. The decisions to drop the linear
+interaction, add the direct ATET check, and propagate the LATE CI into
+the profit calc are our own. The analytical choices, interpretations,
+and written discussion are our own as well.
+
+
+
+
+\end{document}
