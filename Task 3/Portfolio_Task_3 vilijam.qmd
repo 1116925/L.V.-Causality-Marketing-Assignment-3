@@ -1,10 +1,16 @@
 ---
 title: "GRA4158 Marketing - Analysis of Experiments, Portfolio 3"
-format: 
-  html:
-    embed-resources: true
-    self-contained-math: true
-toc: true
+format:
+  pdf:
+    pdf-engine: xelatex
+    toc: true
+    number-sections: true
+    colorlinks: true
+    keep-tex: true
+    syntax-highlighting: idiomatic
+
+  
+warning: false
 author: Vilijam Cekov, Luiz Felipe De Souza Simao
 ---
 ```{r}

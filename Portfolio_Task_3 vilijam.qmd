@@ -2,14 +2,21 @@
 title: "GRA4158 Marketing - Analysis of Experiments, Portfolio 3"
 format:
   pdf:
+    pdf-engine: xelatex
     toc: true
-    toc-depth: 2
+    number-sections: true
+    colorlinks: true
+    keep-tex: true
+    syntax-highlighting: idiomatic
+
+  
+warning: false
 author: Vilijam Cekov, Luiz Felipe De Souza Simao
 ---
 ```{r}
 #| label: load necessary packages
 #| include: false
-
+library(knitr)
 library(sjPlot)
 library(kableExtra)
 library(ggplot2)
@@ -27,7 +34,7 @@ library(xgboost)
 
 # Import Data
 ```{r}
-casedata_task3 <- read.csv("CaseData_Task3.csv", stringsAsFactors = FALSE)
+casedata_task3 <- read.csv("Task 3\\CaseData_Task3.csv", stringsAsFactors = FALSE)
 
 # Display the structure of the data to verify column names
 str(casedata_task3)
@@ -50,119 +57,16 @@ summary(model_adj)
 Extract the ATE value from the regression and calculate robust standard errors using the HC3 estimator, which is more reliable in small samples and with heteroskedasticity.
 ```{r}
 coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
+```
+```{r}
+#| echo: false
 ate <- coef(model_adj)["d"]
 cat("The estimated Average Treatment Effect (ATE) for the treatment is:", ate, "\n")
 ```
 
-# Matching comparisons
-Preparing the data for matching excersises
-```{r}
-ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + 
-X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
-```
+# Propensity Score Estimation and Overlap Diagnostic
+Before implementing matching or weighting, I first estimate the propensity scores and evaluate the common support assumption. This step is a necessary prerequisite to ensure that there is sufficient overlap in the covariate distributions between the treated and control groups
 
-## 1:1 Nearest Neighbor Matching WITHOUT Replacement
-```{r}
-match_no_replace <- matchit(ps_formula, 
-                            data = casedata_task3, 
-                            method = "nearest", 
-                            distance = "glm",   # Uses logistic regression for propensity scores
-                            replace = FALSE,    # Without replacement
-                            ratio = 1)          # 1:1 matching
-
-# View a summary to check covariate balance (ideally Std. Mean Diff < 0.1)
-cat("Balance Summary (Without Replacement):\n")
-print(summary(match_no_replace, un = FALSE))
-
-# Extract the matched dataset
-data_matched_no_replace <- match.data(match_no_replace)
-
-# Estimate the Treatment Effect
-# We include the covariates in the final outcome model to make it "doubly robust"
-model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
-                       X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
-                       data = data_matched_no_replace, 
-                       weights = weights)
-```
-
-Looking at the balance table, the results are not great. Many covariates still have SMDs well above 0.1 -- X12 is at −1.54, X11 at −0.83, X13 at −0.93. The propensity score distance SMD is 1.92, which is quite high. So even after matching, the treated and control groups still look pretty different on these variables. We think this happens because without replacement, once a good control unit gets matched it's gone, and later treated units get stuck with worse matches. This makes us less confident in the ATT from this specification.
-
-Extract the ATT value and calculate robust standard errors using Variance/Covariance Heteroscedasticity-Consistent matrix estimation, which is used to adjust the standard errors of the estimated treatment effects to account for the matched data structure and potential heteroscedasticity.
-```{r}
-# Calculate robust standard errors
-print(coeftest(model_no_replace, vcov. = vcovHC))
-att <- coef(model_no_replace)["d"]
-cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
-```
-
-## 1:1 Nearest Neighbor Matching WITH Replacement
-<!-- Use get_matches() instead of match.data() when matching WITH replacement 
-to properly duplicate rows that are used as matches multiple times. -->
-```{r}
-match_with_replace <- matchit(ps_formula, 
-                              data = casedata_task3, 
-                              method = "nearest", 
-                              distance = "glm",
-                              replace = TRUE,     # With replacement
-                              ratio = 1)
-
-# View a summary to check covariate balance
-cat("Balance Summary (With Replacement):\n")
-print(summary(match_with_replace, un = FALSE))
-
-# Extract the matched dataset
-data_matched_with_replace <- get_matches(match_with_replace)
-
-# Estimate the Treatment Effect
-model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + 
-                         X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
-                         data = data_matched_with_replace, 
-                         weights = weights)
-```
-
-Balance is much better here. Most SMDs drop below 0.13, and the propensity score distance SMD is basically 0 (0.0005). X7 and X8 are still a bit above 0.1 (~0.22–0.24), but overall this is a big improvement over the without-replacement version. This makes sense -- allowing replacement means each treated unit can grab the best available control, even if that control has already been used. The downside is that some controls get reused a lot, which is why we need to cluster the standard errors by subclass below.
-
-Extract the ATT value and calculate robust standard errors clustered by the matched pair ID (`subclass`), which accounts for the fact that some control units may be used multiple times as matches, leading to correlated errors within matched pairs.
-```{r}
-print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
-att <- coef(model_with_replace)["d"]
-cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
-```
-
-## Euclidean Distance Matching
-```{r}
-euc_out <- matchit(
-  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
-       X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
-  data = casedata_task3,
-  method = "nearest",
-  distance = "euclidean",
-  normalize = TRUE
-)
-
-summary(euc_out)
-# bal.tab(euc_out) - balance info already shown in summary above
-
-m_data_euc <- match.data(euc_out)
-lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + 
-             X15 + X16 + X17 + X18 + X19 + X20, 
-             data = m_data_euc, weights = weights)
-```
-
-Extract the ATT value and calculate robust standard errors using the HC3 estimator
-```{r}
-summary(lm_euc)
-
-cat("\nRobust Standard Errors (Euclidean Matching):\n")
-print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
-```
-
-### Comparing matching quality across methods
-Looking at the balance tables side by side, Euclidean distance matching and PSM without replacement perform similarly -- and both are pretty bad. The Euclidean SMDs are actually slightly worse on the key problem covariates (X12 = −1.60 vs. −1.54 for PSM, X11 = −0.86 vs. −0.83). Neither method manages to bring X10–X15 anywhere close to the 0.1 threshold. PSM with replacement is clearly the best of the three -- it gets most covariates under 0.13 and the propensity score distance is essentially perfectly balanced. So in terms of matching quality, with-replacement PSM wins by a wide margin here, though it comes at the cost of reusing control units and needing clustered standard errors. The poor balance in the other two methods means their ATT estimates should probably be taken with a grain of salt.
-
-On common support: the sample sizes tables show that 64 control units (out of 2532) went unmatched, meaning they had no reasonably close treated counterpart. No treated units were discarded. So we're not losing a huge chunk of the data, which is reassuring -- but the fact that those 64 controls couldn't find a match does hint at the limited overlap between the groups, which is also visible in the propensity score density plot in the IPW section. The separation in that plot explains why both the matching balance and the IPW weights struggle here.
-
-# Inverse Probability Weighting (IPW)
 ```{r}
 # Complete-case sample for IPW variables
 ipw_vars <- c("y", "d", paste0("X", 1:20))
@@ -189,7 +93,150 @@ ggplot(df_ipw, aes(x = ps, color = factor(d), fill = factor(d))) +
     fill = "Treatment (d)"
   ) +
   theme_minimal()
+```
 
+**Discussion of Overlap Diagnostic**: The density plot of the estimated propensity scores shows that the treated group (d=1) has a distribution of scores that is quite different from the control group (d=0). The treated units tend to have higher propensity scores, while many control units have scores close to zero. This indicates poor overlap between the groups, which can lead to issues with both matching and weighting methods. In particular, IPW may produce extreme weights for control units with very low propensity scores, leading to unstable estimates. Matching may also struggle to find good matches for treated units if the control group is not well represented across the range of propensity scores. This is a red flag that we may need to consider trimming the sample or using more robust methods that are less sensitive to poor overlap, such as AIPW or DML. As such, it is important to consider that the limited overlap is why both matching and IPW weights may struggle with this dataset, and why we should be cautious in interpreting results from those methods.
+
+# Matching comparisons
+Preparing the data for matching excersises
+```{r}
+ps_formula <- d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + 
+X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20
+```
+
+## 1:1 Nearest Neighbor Matching WITHOUT Replacement
+```{r}
+match_no_replace <- matchit(ps_formula, 
+                            data = casedata_task3, 
+                            method = "nearest", 
+                            distance = "glm",   # Use logistic reg for scores
+                            replace = FALSE,    # Without replacement
+                            ratio = 1)          # 1:1 matching
+
+# View a summary to check covariate balance (ideally Std. Mean Diff < 0.1)
+cat("Balance Summary (Without Replacement):\n")
+print(summary(match_no_replace, un = FALSE))
+
+# Extract the matched dataset
+data_matched_no_replace <- match.data(match_no_replace)
+
+# Estimate the Treatment Effect
+# We include the covariates in the final model to make it "doubly robust"
+model_no_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + 
+                       X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 +
+                       X19 + X20, 
+                       data = data_matched_no_replace, 
+                       weights = weights)
+```
+
+Looking at the balance table, the results are not great. Many covariates still have SMDs well above 0.1 -- X12 is at −1.54, X11 at −0.83, X13 at −0.93. The propensity score distance SMD is 1.92, which is quite high. So even after matching, the treated and control groups still look pretty different on these variables. We think this happens because without replacement, once a good control unit gets matched it's gone, and later treated units get stuck with worse matches. This makes us less confident in the ATT from this specification.
+
+Extract the ATT value and calculate robust standard errors using Variance/Covariance Heteroscedasticity-Consistent matrix estimation, which is used to adjust the standard errors of the estimated treatment effects to account for the matched data structure and potential heteroscedasticity.
+```{r}
+# Calculate robust standard errors
+print(coeftest(model_no_replace, vcov. = vcovHC))
+```
+```{r}
+#| echo: false
+att <- coef(model_no_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+## 1:1 Nearest Neighbor Matching WITH Replacement
+<!-- Use get_matches() instead of match.data() when matching WITH replacement 
+to properly duplicate rows that are used as matches multiple times. -->
+```{r}
+match_with_replace <- matchit(ps_formula, 
+                              data = casedata_task3, 
+                              method = "nearest", 
+                              distance = "glm",
+                              replace = TRUE,     # With replacement
+                              ratio = 1)
+
+# Balance Summary (With Replacement)
+print(summary(match_with_replace, un = FALSE))
+```
+
+Balance is much better here. Most SMDs drop below 0.13, and the propensity score distance SMD is basically 0 (0.0005). X7 and X8 are still a bit above 0.1 (~0.22–0.24), but overall this is a big improvement over the without-replacement version. This makes sense -- allowing replacement means each treated unit can grab the best available control, even if that control has already been used. The downside is that some controls get reused a lot, which is why we need to cluster the standard errors by subclass below.
+
+Extract the ATT value and calculate robust standard errors clustered by the matched pair ID (`subclass`), which accounts for the fact that some control units may be used multiple times as matches, leading to correlated errors within matched pairs.
+```{r}
+# Extract the matched dataset
+data_matched_with_replace <- get_matches(match_with_replace)
+
+# Estimate the Treatment Effect
+model_with_replace <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + 
+                         X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 +
+                         X19 + X20, 
+                         data = data_matched_with_replace, 
+                         weights = weights)
+print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
+```
+```{r}
+#| echo: false
+att <- coef(model_with_replace)["d"]
+cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+```
+
+**Assessing the Need for Regression Adjustment** To evaluate the redundancy of including covariates after matching, I compared the "doubly robust" model (which includes all 20 covariates in the final regression) against a "simple matched model" that uses only the treatment indicator on the matched sample.
+Discussion of Results: If the matching has achieved high balance (as indicated by my SMD diagnostics showing most variables under 0.13), the estimates from these two models should be nearly identical. A significant difference would suggest that matching was imperfect and the regression adjustment is still working to "clean up" remaining imbalance in the covariates
+
+```{r}
+# Simple matched model without covariates
+model_simple_matched <- lm(y ~ d,
+                           data = data_matched_with_replace,
+                           weights = weights)
+
+# Summary of the simple model
+summary(model_simple_matched)
+```
+```{r}
+#| echo: false
+
+# Extract the ATT (coefficient for d)
+att_simple <- coef(model_simple_matched)["d"]
+
+cat("Simple Matched ATT:", att_simple, "\n")
+cat("Doubly Robust ATT:", att, "\n")
+```
+
+As made evident by the highly innacurate ATT measure of the simple matched model, the simple matched model's ATT is quite different from the doubly robust version (-10.3 vs. 23.3), which suggests that the matching alone didn't achieve good balance and the regression adjustment is still doing important work to control for confounding.
+
+## Euclidean Distance Matching
+```{r}
+euc_out <- matchit(
+  d ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
+       X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+  data = casedata_task3,
+  method = "nearest",
+  distance = "euclidean",
+  normalize = TRUE
+)
+
+summary(euc_out)
+# bal.tab(euc_out) - balance info already shown in summary above
+
+m_data_euc <- match.data(euc_out)
+lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + 
+             X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20, 
+             data = m_data_euc, weights = weights)
+```
+
+Extract the ATT value and calculate robust standard errors using the HC3 estimator
+```{r}
+summary(lm_euc)
+
+# Robust Standard Errors (Euclidean Matching):
+print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
+```
+
+### Comparing matching quality across methods
+Looking at the balance tables side by side, Euclidean distance matching and PSM without replacement perform similarly -- and both are pretty bad. The Euclidean SMDs are actually slightly worse on the key problem covariates (X12 = −1.60 vs. −1.54 for PSM, X11 = −0.86 vs. −0.83). Neither method manages to bring X10–X15 anywhere close to the 0.1 threshold. PSM with replacement is clearly the best of the three -- it gets most covariates under 0.13 and the propensity score distance is essentially perfectly balanced. So in terms of matching quality, with-replacement PSM wins by a wide margin here, though it comes at the cost of reusing control units and needing clustered standard errors. The poor balance in the other two methods means their ATT estimates should probably be taken with a grain of salt.
+
+On common support: the sample sizes tables show that 64 control units (out of 2532) went unmatched, meaning they had no reasonably close treated counterpart. No treated units were discarded. So we're not losing a huge chunk of the data, which is reassuring -- but the fact that those 64 controls couldn't find a match does hint at the limited overlap between the groups, which is also visible in the propensity score density plot in the IPW section. The separation in that plot explains why both the matching balance and the IPW weights struggle here.
+
+# Inverse Probability Weighting (IPW)
+```{r}
 # 2) Trim propensity scores to reduce extreme weights under weak overlap
 df_ipw$ps_trim <- pmin(pmax(df_ipw$ps, 0.01), 0.99)
 
@@ -230,31 +277,46 @@ for (b in seq_len(B_ipw)) {
 ipw_boot_mean <- mean(boot_ipw_ate)
 ipw_boot_se <- sd(boot_ipw_ate)
 ipw_boot_ci <- quantile(boot_ipw_ate, probs = c(0.025, 0.975))
+```
 
-cat("Bootstrap mean (IPW):", round(ipw_boot_mean, 4), "\n")
-cat("Bootstrap SE (IPW):", round(ipw_boot_se, 4), "\n")
-cat("95% percentile CI (IPW): [", round(ipw_boot_ci[1], 4), ",", round(ipw_boot_ci[2], 4), "]\n")
+```{r}
+#| echo: false
+summary_df <- data.frame(
+  Metric = c("Bootstrap Mean (IPW)", "Bootstrap SE (IPW)", "95% Percentile CI (IPW)"),
+  Value = c(
+    round(ipw_boot_mean, 4),
+    round(ipw_boot_se, 4),
+    paste0("[", round(ipw_boot_ci[1], 4), ", ", round(ipw_boot_ci[2], 4), "]")
+  )
+)
 
+# Render the table using kable
+kable(summary_df, 
+      col.names = c("Statistic", "Value"), 
+      caption = "IPW Bootstrap Results",
+      align = c("l", "c"))
+```
+```{r}
 # 5) Secondary comparison: IPW weighted regression-adjustment model
 df_ipw$ipw_weight <- ifelse(df_ipw$d == 1,
                             1 / df_ipw$ps_trim,
                             1 / (1 - df_ipw$ps_trim))
 
-cat("\nInverse Probability Weights Summary:\n")
+# Inverse Probability Weights Summary:
 summary(df_ipw$ipw_weight)
 
-lm_ipw <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
+
+#Secondary comparison: weighted lm IPW-RA model
+lm_ipw <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 +
+             X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
              data = df_ipw, weights = ipw_weight)
 
-cat("\nSecondary comparison: weighted lm IPW-RA model\n")
 print(summary(lm_ipw))
 print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3")))
 ```
 
 ## IPW Critical Discussion Points
-The manual IPW estimate came out at around −318, which obviously doesn't make sense for a sales effect. Looking at the overlap plot above, I think the issue is clear: the propensity score distributions for treated and control are quite separated. A lot of control units have scores close to 0, and when you invert those (dividing by something like 0.01 gives a weight of ~100), a few observations end up dominating the whole estimate. The 0.01/0.99 trimming we used wasn't aggressive enough to fix this.
-
-This is basically the classic problem with IPW -- it's very sensitive to poor overlap. The weighted regression version (~15.81) does much better because the regression component doesn't rely purely on the weights. It also shows why AIPW and DML are generally more appealing: they don't put all their eggs in the weighting basket.
+The manual IPW estimate came out at around −318, which obviously doesn't make sense for a sales effect and is likely due to its sensitivity to poor overlap. The weighted regression version (~15.81) does much better because the regression component doesn't rely purely on the weights. It also shows why AIPW and DML are generally more appealing: they don't put all their eggs in the weighting basket.
 
 # Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
 This section implements AIPW manually using the doubly robust score:
@@ -309,7 +371,8 @@ estimate_aipw_ate <- function(data, covariate_names, trim = 0.01) {
   #    If either the PS model or the outcome models are correctly specified,
   #    the estimator remains consistent.
   score_treated <- (data$treatment / p_hat) * (data$sales - mu1_hat) + mu1_hat
-  score_control <- ((1 - data$treatment) / (1 - p_hat)) * (data$sales - mu0_hat) + mu0_hat
+  score_control <- ((1 - data$treatment) /
+                   (1 - p_hat)) * (data$sales - mu0_hat) + mu0_hat
 
   mean(score_treated) - mean(score_control)
 }
@@ -333,10 +396,23 @@ for (b in seq_len(B)) {
 aipw_se <- sd(boot_ate)
 aipw_ci <- quantile(boot_ate, probs = c(0.025, 0.975))
 aipw_boot_mean <- mean(boot_ate)
+```
+```{r}
+#| echo: false
+aipw_summary_df <- data.frame(
+  Metric = c("Bootstrap Mean (AIPW)", "Bootstrap SE (AIPW)", "95% Percentile CI (AIPW)"),
+  Value = c(
+    round(aipw_boot_mean, 4),
+    round(aipw_se, 4),
+    paste0("[", round(aipw_ci[1], 4), ", ", round(aipw_ci[2], 4), "]")
+  )
+)
 
-cat("Bootstrap mean (AIPW):", round(aipw_boot_mean, 4), "\n")
-cat("Bootstrap SE (AIPW):", round(aipw_se, 4), "\n")
-cat("95% Bootstrap CI (AIPW): [", round(aipw_ci[1], 4), ",", round(aipw_ci[2], 4), "]\n")
+# Render the table using kable
+kable(aipw_summary_df, 
+      col.names = c("Statistic", "Value"), 
+      caption = "AIPW Bootstrap Results",
+      align = c("l", "c"))
 ```
 
 ## AIPW Critical Discussion Points
@@ -395,7 +471,9 @@ get_lrn <- function(primary_id, fallback_id = NULL, ...) {
     return(lrn(fallback_id, ...))
   }
   stop("Required learner not found: ", primary_id,
-       if (!is.null(fallback_id)) paste0(" (fallback also missing: ", fallback_id, ")") else "")
+       if (!is.null(fallback_id))
+       paste0(" (fallback also missing: ", fallback_id, ")")
+       else "")
 }
 
 # Run one DML specification: nuisance metrics + PLR estimate
@@ -405,17 +483,24 @@ run_dml_spec <- function(spec_name, regr_id, classif_id,
 
   # Outcome nuisance model g(X): evaluate out-of-sample RMSE
   learner_y <- get_lrn(regr_id, regr_fallback)
-  rr_y <- resample(task_y, learner_y$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  rr_y <- resample(task_y,
+          learner_y$clone(),
+          rsmp("cv", folds = 5),
+          store_models = FALSE)
   rmse_y <- rr_y$aggregate(msr("regr.rmse"))
 
   # Selection nuisance model m(X): evaluate out-of-sample log-loss and error
-  learner_d_class <- get_lrn(classif_id, classif_fallback, predict_type = "prob")
-  rr_d <- resample(task_d, learner_d_class$clone(), rsmp("cv", folds = 5), store_models = FALSE)
+  learner_d_class <- get_lrn(classif_id,
+                             classif_fallback,
+                             predict_type = "prob")
+  rr_d <- resample(task_d,
+                   learner_d_class$clone(),
+                   rsmp("cv", folds = 5),
+                   store_models = FALSE)
   logloss_d <- rr_d$aggregate(msr("classif.logloss"))
   ce_d <- rr_d$aggregate(msr("classif.ce"))
 
   # PLR in DoubleML uses regression nuisance learners for both l(X) and m(X)
-  # (classification learner above is used for requested selection-model diagnostics).
   learner_m_regr <- get_lrn(regr_id, regr_fallback)
   dml_plr <- DoubleMLPLR$new(
     data = dml_data,
@@ -468,15 +553,15 @@ dml_results_to_print[num_cols] <- lapply(dml_results_to_print[num_cols], round, 
 print(dml_results_to_print, row.names = FALSE)
 
 # "Well-fitting" model selection rule:
-# prioritize low out-of-sample nuisance errors (RMSE_Y and LogLoss_D),
-# because DML relies on high-quality nuisance prediction rather than interpretability.
+# prioritize low out-of-sample nuisance errors (RMSE_Y and LogLoss_D)
 scale01 <- function(x) {
   rng <- range(x)
   if (diff(rng) == 0) return(rep(0, length(x)))
   (x - rng[1]) / diff(rng)
 }
 
-dml_results$fit_score <- scale01(dml_results$RMSE_Y) + scale01(dml_results$LogLoss_D)
+dml_results$fit_score <- scale01(dml_results$RMSE_Y) +
+                         scale01(dml_results$LogLoss_D)
 best_idx <- which.min(dml_results$fit_score)
 
 cat("\nBest-fitting nuisance combination (lower RMSE + LogLoss):",
@@ -501,7 +586,7 @@ att_no_replace <- coef(model_no_replace)["d"]
 se_no_replace <- sqrt(diag(vcovHC(model_no_replace, type = "HC3")))["d"]
 
 att_with_replace <- coef(model_with_replace)["d"]
-se_with_replace <- sqrt(diag(vcovCL(model_with_replace, cluster = ~subclass)))["d"]
+se_with_replace <- sqrt(diag(vcovCL(model_with_replace,cluster=~subclass)))["d"]
 
 ate_euc <- coef(lm_euc)["d"]
 se_euc <- sqrt(diag(vcovHC(lm_euc, type = "HC3")))["d"]
@@ -618,7 +703,10 @@ dml_comparison <- data.frame(
 )
 
 comparison_table <- rbind(comparison_table_base, dml_comparison)
+```
 
+```{r}
+#| echo: false
 cat("\n=== Summary: Treatment Effects Across All Methods (with 95% CIs) ===\n\n")
 print(comparison_table, row.names = FALSE)
 

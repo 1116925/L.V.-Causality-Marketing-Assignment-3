@@ -1,0 +1,1397 @@
+% Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+  letterpaper,
+  DIV=11,
+  numbers=noendperiod]{scrartcl}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{5}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+% Make \paragraph and \subparagraph free-standing
+\makeatletter
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}{
+    \@ifstar
+      \xxxParagraphStar
+      \xxxParagraphNoStar
+  }
+  \newcommand{\xxxParagraphStar}[1]{\oldparagraph*{#1}\mbox{}}
+  \newcommand{\xxxParagraphNoStar}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}{
+    \@ifstar
+      \xxxSubParagraphStar
+      \xxxSubParagraphNoStar
+  }
+  \newcommand{\xxxSubParagraphStar}[1]{\oldsubparagraph*{#1}\mbox{}}
+  \newcommand{\xxxSubParagraphNoStar}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+\makeatother
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{241,243,245}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.40,0.45,0.13}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\ExtensionTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.07,0.07,0.07}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+
+
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+ 
+
+
+\KOMAoption{captions}{tableheading}
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\AtBeginDocument{%
+\ifdefined\contentsname
+  \renewcommand*\contentsname{Table of contents}
+\else
+  \newcommand\contentsname{Table of contents}
+\fi
+\ifdefined\listfigurename
+  \renewcommand*\listfigurename{List of Figures}
+\else
+  \newcommand\listfigurename{List of Figures}
+\fi
+\ifdefined\listtablename
+  \renewcommand*\listtablename{List of Tables}
+\else
+  \newcommand\listtablename{List of Tables}
+\fi
+\ifdefined\figurename
+  \renewcommand*\figurename{Figure}
+\else
+  \newcommand\figurename{Figure}
+\fi
+\ifdefined\tablename
+  \renewcommand*\tablename{Table}
+\else
+  \newcommand\tablename{Table}
+\fi
+}
+\@ifpackageloaded{float}{}{\usepackage{float}}
+\floatstyle{ruled}
+\@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
+\floatname{codelisting}{Listing}
+\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\makeatother
+\makeatletter
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
+\makeatother
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={GRA4158 Marketing - Analysis of Experiments, Portfolio 4},
+  pdfauthor={Vilijam Cekov, Luiz Felipe De Souza Simao},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+
+\title{GRA4158 Marketing - Analysis of Experiments, Portfolio 4}
+\author{Vilijam Cekov, Luiz Felipe De Souza Simao}
+\date{}
+\begin{document}
+\maketitle
+
+\renewcommand*\contentsname{Table of contents}
+{
+\hypersetup{linkcolor=}
+\setcounter{tocdepth}{3}
+\tableofcontents
+}
+
+\section{Import Data}\label{import-data}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{df }\OtherTok{\textless{}{-}} \FunctionTok{read\_delim}\NormalTok{(}\StringTok{"Store\_data\_2026\_taks4.csv"}\NormalTok{, }\AttributeTok{delim =} \StringTok{";"}\NormalTok{)}
+
+\CommentTok{\# Create necessary dummy variables}
+\NormalTok{df }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}
+    \CommentTok{\# \textquotesingle{}post\_treatment\textquotesingle{} is 1 for the weeks after the marketing strategy started}
+    \AttributeTok{post\_treatment =} \FunctionTok{ifelse}\NormalTok{(Weekind }\SpecialCharTok{\textgreater{}=} \DecValTok{78}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{),}
+    \CommentTok{\# \textquotesingle{}treated\textquotesingle{} is the actual interaction / DiD term (1 ONLY for Store 109 AND Weekind \textgreater{}= 78)}
+    \AttributeTok{treated =} \FunctionTok{ifelse}\NormalTok{(storeNum }\SpecialCharTok{==} \DecValTok{109} \SpecialCharTok{\&}\NormalTok{ Weekind }\SpecialCharTok{\textgreater{}=} \DecValTok{78}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{),}
+    \CommentTok{\# Variable identifying the treated store (regardless of time)}
+    \AttributeTok{is\_treated\_store =} \FunctionTok{ifelse}\NormalTok{(storeNum }\SpecialCharTok{==} \DecValTok{109}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)}
+\NormalTok{  )}
+
+\CommentTok{\# Display the structure of the data to verify column names}
+\FunctionTok{str}\NormalTok{(df)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+tibble [2,184 x 18] (S3: tbl_df/tbl/data.frame)
+ $ storeNum        : num [1:2184] 101 101 101 101 101 101 101 101 101 101 ...
+ $ Year            : num [1:2184] 2024 2024 2024 2024 2024 ...
+ $ Week            : num [1:2184] 1 2 3 4 5 6 7 8 9 10 ...
+ $ Date            : Date[1:2184], format: "2024-01-08" "2024-01-15" ...
+ $ Weekind         : num [1:2184] 1 2 3 4 5 6 7 8 9 10 ...
+ $ p1sales         : num [1:2184] 457 500 456 450 454 449 453 450 498 458 ...
+ $ p2sales         : num [1:2184] 588 707 591 591 590 593 710 591 594 592 ...
+ $ p1price         : num [1:2184] 2.49 2.99 2.19 2.29 2.19 2.79 2.49 2.99 2.79 2.79 ...
+ $ p2price         : num [1:2184] 2.99 3.19 2.99 3.19 3.19 2.59 3.19 3.19 2.99 3.19 ...
+ $ p1prom          : num [1:2184] 0 1 0 0 0 0 0 0 1 0 ...
+ $ p2prom          : num [1:2184] 0 1 0 0 0 0 1 0 0 0 ...
+ $ compind         : num [1:2184] 0.123 0.123 0.123 0.123 0.123 0.123 0.123 0.123 0.123 0.123 ...
+ $ storesize       : num [1:2184] 143 143 143 143 143 143 143 143 143 143 ...
+ $ city            : chr [1:2184] "OSLO" "OSLO" "OSLO" "OSLO" ...
+ $ citysize        : num [1:2184] 730000 730000 730000 730000 730000 730000 730000 730000 730000 730000 ...
+ $ post_treatment  : num [1:2184] 0 0 0 0 0 0 0 0 0 0 ...
+ $ treated         : num [1:2184] 0 0 0 0 0 0 0 0 0 0 ...
+ $ is_treated_store: num [1:2184] 0 0 0 0 0 0 0 0 0 0 ...
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Check the first few rows}
+\FunctionTok{head}\NormalTok{(df)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+# A tibble: 6 x 18
+  storeNum  Year  Week Date       Weekind p1sales p2sales p1price p2price p1prom
+     <dbl> <dbl> <dbl> <date>       <dbl>   <dbl>   <dbl>   <dbl>   <dbl>  <dbl>
+1      101  2024     1 2024-01-08       1     457     588    2.49    2.99      0
+2      101  2024     2 2024-01-15       2     500     707    2.99    3.19      1
+3      101  2024     3 2024-01-22       3     456     591    2.19    2.99      0
+4      101  2024     4 2024-01-29       4     450     591    2.29    3.19      0
+5      101  2024     5 2024-02-05       5     454     590    2.19    3.19      0
+6      101  2024     6 2024-02-12       6     449     593    2.79    2.59      0
+# i 8 more variables: p2prom <dbl>, compind <dbl>, storesize <dbl>, city <chr>,
+#   citysize <dbl>, post_treatment <dbl>, treated <dbl>, is_treated_store <dbl>
+\end{verbatim}
+
+\section{A simple pre-post analysis of only the treated store for each
+product controlling for relevant
+covariates}\label{a-simple-pre-post-analysis-of-only-the-treated-store-for-each-product-controlling-for-relevant-covariates}
+
+The relevant covariates chosen are price and promotion for each product,
+as they are likely to influence sales. Time-invariant covariates such as
+store size and city size are excluded from this analysis sicne these
+stable factors are automatically controlled without requiring additional
+covariates. For this method to output an appropriate causal estimate, we
+would need to assume that no other external factors influenced sales at
+Store 109 between the pre- and post-treatment weeks. (This is a strong
+and unlikely assumption for this dataset, which is why we expect that
+more advanced methods like Two-Way Fixed Effects or Synthetic Control
+are generally more appropriate for establishing causality)
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Filter data to only include Store 109}
+\NormalTok{df\_109 }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{filter}\NormalTok{(storeNum }\SpecialCharTok{==} \DecValTok{109}\NormalTok{)}
+
+\CommentTok{\# {-}{-}{-} Product 1: Pre{-}Post Model {-}{-}{-}}
+\NormalTok{pre\_post\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ post\_treatment }\SpecialCharTok{+}\NormalTok{ p1price }\SpecialCharTok{+}\NormalTok{ p1prom, }\AttributeTok{data =}\NormalTok{ df\_109)}
+\FunctionTok{summary}\NormalTok{(pre\_post\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+Call:
+lm(formula = p1sales ~ post_treatment + p1price + p1prom, data = df_109)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-23.202  -4.770   1.284   4.793  16.628 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    320.5430     6.3717  50.307   <2e-16 ***
+post_treatment  33.6894     1.7107  19.693   <2e-16 ***
+p1price         -0.4704     2.4406  -0.193    0.848    
+p1prom          35.2861     2.0358  17.332   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 7.615 on 100 degrees of freedom
+Multiple R-squared:  0.8839,    Adjusted R-squared:  0.8804 
+F-statistic: 253.7 on 3 and 100 DF,  p-value: < 2.2e-16
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 2: Pre{-}Post Model {-}{-}{-}}
+\NormalTok{pre\_post\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ post\_treatment }\SpecialCharTok{+}\NormalTok{ p2price }\SpecialCharTok{+}\NormalTok{ p2prom, }\AttributeTok{data =}\NormalTok{ df\_109)}
+\FunctionTok{summary}\NormalTok{(pre\_post\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+Call:
+lm(formula = p2sales ~ post_treatment + p2price + p2prom, data = df_109)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-17.068  -5.433   0.780   5.211  41.456 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)     380.384      7.083  53.703   <2e-16 ***
+post_treatment  -29.710      1.870 -15.886   <2e-16 ***
+p2price          -4.068      2.570  -1.583    0.117    
+p2prom           78.256      2.125  36.831   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 8.225 on 100 degrees of freedom
+Multiple R-squared:  0.9361,    Adjusted R-squared:  0.9342 
+F-statistic: 488.1 on 3 and 100 DF,  p-value: < 2.2e-16
+\end{verbatim}
+
+\section{A simple two-way fixed-effect panel model for each product
+controlling for relevant
+covariates}\label{a-simple-two-way-fixed-effect-panel-model-for-each-product-controlling-for-relevant-covariates}
+
+Store fixed effects will automatically absorb (control for) all
+time-invariant store characteristics (like storesize and city). Time
+fixed effects will absorb aggregate shocks that affect all stores in a
+given week. By accounting for these factors, the TWFE model addresses
+the primary endogeneity problem of unobserved effects that are either
+subject-invariant or time-invariant. While the simple pre-post model
+assumes the counterfactual outcome remains constant over time, the TWFE
+model (within a Difference-in-Differences framework) relaxes this by
+assuming that treatment and control groups would follow parallel trends
+in the absence of treatment. Where this is assumed to produce smaller
+standard errors and tighter confidence intervals and allowing for a more
+granular analysis of heterogeneity on the individual and time dimensions
+rather than just group-level averages in contrast to pre-post analysis,
+the introduction of the parallel trends assumption also means that if
+the treated store had a unique sales trajectory that was not shared by
+any control stores, the TWFE estimate could be biased.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Convert the data frame to a panel data frame for plm}
+\NormalTok{pdf }\OtherTok{\textless{}{-}} \FunctionTok{pdata.frame}\NormalTok{(df, }\AttributeTok{index =} \FunctionTok{c}\NormalTok{(}\StringTok{"storeNum"}\NormalTok{, }\StringTok{"Weekind"}\NormalTok{))}
+
+\CommentTok{\# {-}{-}{-} Product 1: TWFE Model {-}{-}{-}}
+\NormalTok{twfe\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{plm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ treated }\SpecialCharTok{+}\NormalTok{ p1price }\SpecialCharTok{+}\NormalTok{ p1prom, }
+               \AttributeTok{data =}\NormalTok{ pdf, }
+               \AttributeTok{model =} \StringTok{"within"}\NormalTok{, }
+               \AttributeTok{effect =} \StringTok{"twoways"}\NormalTok{)}
+\FunctionTok{summary}\NormalTok{(twfe\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Twoways effects Within Model
+
+Call:
+plm(formula = p1sales ~ treated + p1price + p1prom, data = pdf, 
+    effect = "twoways", model = "within")
+
+Balanced Panel: n = 21, T = 104, N = 2184
+
+Residuals:
+      Min.    1st Qu.     Median    3rd Qu.       Max. 
+-51.171933  -4.976294  -0.031958   4.792511  47.537512 
+
+Coefficients:
+        Estimate Std. Error t-value  Pr(>|t|)    
+treated 29.97912    2.56688 11.6792 < 2.2e-16 ***
+p1price -2.47458    0.81541 -3.0348  0.002437 ** 
+p1prom  37.59018    0.66334 56.6678 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Total Sum of Squares:    681580
+Residual Sum of Squares: 257950
+R-Squared:      0.62155
+Adj. R-Squared: 0.59837
+F-statistic: 1126.1 on 3 and 2057 DF, p-value: < 2.22e-16
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 2: TWFE Model {-}{-}{-}}
+\NormalTok{twfe\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{plm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ treated }\SpecialCharTok{+}\NormalTok{ p2price }\SpecialCharTok{+}\NormalTok{ p2prom, }
+               \AttributeTok{data =}\NormalTok{ pdf, }
+               \AttributeTok{model =} \StringTok{"within"}\NormalTok{, }
+               \AttributeTok{effect =} \StringTok{"twoways"}\NormalTok{)}
+\FunctionTok{summary}\NormalTok{(twfe\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Twoways effects Within Model
+
+Call:
+plm(formula = p2sales ~ treated + p2price + p2prom, data = pdf, 
+    effect = "twoways", model = "within")
+
+Balanced Panel: n = 21, T = 104, N = 2184
+
+Residuals:
+    Min.  1st Qu.   Median  3rd Qu.     Max. 
+-67.5821  -6.1317  -0.3684   5.8279  52.7506 
+
+Coefficients:
+         Estimate Std. Error  t-value  Pr(>|t|)    
+treated -34.29122    3.07136 -11.1649 < 2.2e-16 ***
+p2price  -2.95105    0.89513  -3.2968 0.0009947 ***
+p2prom   89.42444    0.83716 106.8185 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Total Sum of Squares:    2424600
+Residual Sum of Squares: 368880
+R-Squared:      0.84786
+Adj. R-Squared: 0.83854
+F-statistic: 3821.11 on 3 and 2057 DF, p-value: < 2.22e-16
+\end{verbatim}
+
+Correcting for autocorrelation and heteroskedasticity
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 1 TWFE with Clustered Standard Errors {-}{-}{-}}
+\FunctionTok{coeftest}\NormalTok{(twfe\_p1, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(twfe\_p1, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+t test of coefficients:
+
+        Estimate Std. Error t value  Pr(>|t|)    
+treated  29.9791     4.0348  7.4301 1.582e-13 ***
+p1price  -2.4746     0.8446 -2.9299  0.003428 ** 
+p1prom   37.5902     1.3932 26.9812 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 2 TWFE with Clustered Standard Errors {-}{-}{-}}
+\FunctionTok{coeftest}\NormalTok{(twfe\_p2, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(twfe\_p2, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+t test of coefficients:
+
+         Estimate Std. Error t value  Pr(>|t|)    
+treated -34.29122    4.45448 -7.6981 2.129e-14 ***
+p2price  -2.95105    0.81652 -3.6142 0.0003085 ***
+p2prom   89.42444    4.30234 20.7851 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\section{Simple DiD, SC, and SDID analyses for each
+product}\label{simple-did-sc-and-sdid-analyses-for-each-product}
+
+\subsection{Check for parallel trends
+assumption}\label{check-for-parallel-trends-assumption}
+
+\subsubsection{Visual inspection of pre-treatment
+trends}\label{visual-inspection-of-pre-treatment-trends}
+
+Ideally, the treated store's sales should follow a similar trajectory to
+the control stores in the pre-treatment period. If the treated store had
+a unique sales pattern that was not shared by any control stores, this
+would violate the parallel trends assumption and could bias our
+estimates. By plotting the average sales of the treated store against
+the average sales of the control stores over time, we can visually
+assess whether they exhibit similar trends before the treatment starts
+(Weekind \textless{} 78). If they do, this supports the validity of our
+DiD and SDID analyses; if not, we may need to consider alternative
+methods or be cautious in interpreting our results.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 1 Plot {-}{-}{-}}
+\CommentTok{\# Aggregate average sales per week for treated vs control stores}
+\NormalTok{trend\_data\_p1 }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{group\_by}\NormalTok{(Weekind, is\_treated\_store) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{summarise}\NormalTok{(}\AttributeTok{mean\_sales =} \FunctionTok{mean}\NormalTok{(p1sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{), }\AttributeTok{.groups =} \StringTok{\textquotesingle{}drop\textquotesingle{}}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{, }\StringTok{"Treated (Store 109)"}\NormalTok{, }\StringTok{"Control (Other Stores)"}\NormalTok{))}
+
+\NormalTok{plot\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p1, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind, }\AttributeTok{y =}\NormalTok{ mean\_sales, }\AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }\AttributeTok{x =} \DecValTok{76}\NormalTok{, }\AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p1}\SpecialCharTok{$}\NormalTok{mean\_sales), }
+           \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }\AttributeTok{angle =} \DecValTok{90}\NormalTok{, }\AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 1: Sales Trends (Treated vs Control)"}\NormalTok{,}
+       \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
+       \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{()}
+
+\FunctionTok{print}\NormalTok{(plot\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/Visual inspection of parallel trends assumption-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 2 Plot {-}{-}{-}}
+\NormalTok{trend\_data\_p2 }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{group\_by}\NormalTok{(Weekind, is\_treated\_store) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{summarise}\NormalTok{(}\AttributeTok{mean\_sales =} \FunctionTok{mean}\NormalTok{(p2sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{), }\AttributeTok{.groups =} \StringTok{\textquotesingle{}drop\textquotesingle{}}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{Group =} \FunctionTok{ifelse}\NormalTok{(is\_treated\_store }\SpecialCharTok{==} \DecValTok{1}\NormalTok{, }\StringTok{"Treated (Store 109)"}\NormalTok{, }\StringTok{"Control (Other Stores)"}\NormalTok{))}
+
+\NormalTok{plot\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(trend\_data\_p2, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ Weekind, }\AttributeTok{y =}\NormalTok{ mean\_sales, }\AttributeTok{color =}\NormalTok{ Group)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_vline}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{78}\NormalTok{, }\AttributeTok{linetype =} \StringTok{"dashed"}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{, }\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{annotate}\NormalTok{(}\StringTok{"text"}\NormalTok{, }\AttributeTok{x =} \DecValTok{76}\NormalTok{, }\AttributeTok{y =} \FunctionTok{max}\NormalTok{(trend\_data\_p2}\SpecialCharTok{$}\NormalTok{mean\_sales), }
+           \AttributeTok{label =} \StringTok{"Treatment Start"}\NormalTok{, }\AttributeTok{angle =} \DecValTok{90}\NormalTok{, }\AttributeTok{vjust =} \FloatTok{1.5}\NormalTok{, }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Product 2: Sales Trends (Treated vs Control)"}\NormalTok{,}
+       \AttributeTok{x =} \StringTok{"Week Index"}\NormalTok{,}
+       \AttributeTok{y =} \StringTok{"Average Weekly Sales"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{()}
+
+\FunctionTok{print}\NormalTok{(plot\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/Visual inspection of parallel trends assumption-2.pdf}}
+
+\subsubsection{Statistical test for parallel trends: Pre-treatment
+interaction
+model}\label{statistical-test-for-parallel-trends-pre-treatment-interaction-model}
+
+Additionally to doing the visual inspection, we can also run a formal
+statistical test for parallel trends by regressing sales on the store
+dummy, a linear time trend (Weekind), and their interaction, but only
+using the pre-treatment data (Weeks 1 to 77). If the coefficient on the
+interaction term is statistically significant, it would suggest that the
+treated store had a different trend compared to the control stores even
+before the treatment started, which would violate the parallel trends
+assumption and potentially bias our DiD and SDID estimates.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Filter the data to ONLY include the pre{-}treatment period (Weeks 1 to 77)}
+\NormalTok{df\_pre }\OtherTok{\textless{}{-}}\NormalTok{ df }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{filter}\NormalTok{(Weekind }\SpecialCharTok{\textless{}} \DecValTok{78}\NormalTok{)}
+
+\CommentTok{\# {-}{-}{-} Product 1: Parallel Trends Test {-}{-}{-}}
+\NormalTok{pt\_test\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ is\_treated\_store }\SpecialCharTok{*}\NormalTok{ Weekind, }\AttributeTok{data =}\NormalTok{ df\_pre)}
+\FunctionTok{summary}\NormalTok{(pt\_test\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+Call:
+lm(formula = p1sales ~ is_treated_store * Weekind, data = df_pre)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-169.496  -49.819   -0.924   46.066  168.571 
+
+Coefficients:
+                          Estimate Std. Error t value Pr(>|t|)    
+(Intercept)              381.56235    3.47935 109.665  < 2e-16 ***
+is_treated_store         -68.18266   15.94439  -4.276 2.01e-05 ***
+Weekind                    0.03809    0.07751   0.491    0.623    
+is_treated_store:Weekind   0.24354    0.35520   0.686    0.493    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 67.61 on 1613 degrees of freedom
+Multiple R-squared:  0.03364,   Adjusted R-squared:  0.03185 
+F-statistic: 18.72 on 3 and 1613 DF,  p-value: 6.166e-12
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-} Product 2: Parallel Trends Test {-}{-}{-}}
+\NormalTok{pt\_test\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ is\_treated\_store }\SpecialCharTok{*}\NormalTok{ Weekind, }\AttributeTok{data =}\NormalTok{ df\_pre)}
+\FunctionTok{summary}\NormalTok{(pt\_test\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+Call:
+lm(formula = p2sales ~ is_treated_store * Weekind, data = df_pre)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-243.39  -71.42   -8.20   76.70  333.94 
+
+Coefficients:
+                           Estimate Std. Error t value Pr(>|t|)    
+(Intercept)              462.922368   5.666993  81.687  < 2e-16 ***
+is_treated_store         -96.208766  25.969426  -3.705 0.000219 ***
+Weekind                    0.006553   0.126245   0.052 0.958611    
+is_treated_store:Weekind   0.346778   0.578529   0.599 0.548981    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 110.1 on 1613 degrees of freedom
+Multiple R-squared:  0.02523,   Adjusted R-squared:  0.02341 
+F-statistic: 13.91 on 3 and 1613 DF,  p-value: 5.857e-09
+\end{verbatim}
+
+\textbf{Findings:} For both products, the visual interpretation leads to
+believe that there is a slight positive trend in the treated store's
+sales compared to the control stores in the pre-treatment period, which
+could potentially violate the parallel trends assumption. However, the
+formal statistical test for parallel trends (the interaction term
+between the treated store dummy and the linear time trend
+{[}is\_treated\_store:Weekind{]}) is not statistically significant for
+either product (p \textgreater{} 0.05). This suggests that while there
+may be some visual differences in trends, they are not statistically
+significant enough to conclusively reject the parallel trends assumption
+possibly due to limited sample size or high variability. Therefore, we
+can proceed with our DiD and SDID analyses, but we should be cautious in
+interpreting the results given the potential for some underlying
+differences in pre-treatment trends.
+
+\subsection{Evaluating the treatment effect using DiD, SC, and SDID
+methods for each
+product}\label{evaluating-the-treatment-effect-using-did-sc-and-sdid-methods-for-each-product}
+
+\subsubsection{Product 1: p1sales}\label{product-1-p1sales}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Ensure data frame is standard class (synthdid prefers plain data.frames over tibbles)}
+\NormalTok{df }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(df)}
+
+\CommentTok{\# Setup panel matrices for Product 1}
+\NormalTok{setup\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{panel.matrices}\NormalTok{(}
+\NormalTok{  df,}
+  \AttributeTok{unit =} \StringTok{"storeNum"}\NormalTok{,}
+  \AttributeTok{time =} \StringTok{"Weekind"}\NormalTok{,}
+  \AttributeTok{outcome =} \StringTok{"p1sales"}\NormalTok{,}
+  \AttributeTok{treatment =} \StringTok{"treated"}
+\NormalTok{)}
+
+\CommentTok{\# Estimate the treatment effects for Product 1}
+\NormalTok{sdid\_est\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p1}\SpecialCharTok{$}\NormalTok{Y, setup\_p1}\SpecialCharTok{$}\NormalTok{N0, setup\_p1}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{did\_est\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{did\_estimate}\NormalTok{(setup\_p1}\SpecialCharTok{$}\NormalTok{Y, setup\_p1}\SpecialCharTok{$}\NormalTok{N0, setup\_p1}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{sc\_est\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{sc\_estimate}\NormalTok{(setup\_p1}\SpecialCharTok{$}\NormalTok{Y, setup\_p1}\SpecialCharTok{$}\NormalTok{N0, setup\_p1}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{estimates\_p1 }\OtherTok{=} \FunctionTok{list}\NormalTok{(did\_est\_p1, sc\_est\_p1, sdid\_est\_p1)}
+
+\CommentTok{\# Print the estimates}
+\FunctionTok{names}\NormalTok{(estimates\_p1) }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}Diff{-}in{-}Diff\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Synthetic Control\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Synthetic Diff{-}in{-}Diff\textquotesingle{}}\NormalTok{)}
+\FunctionTok{print}\NormalTok{(}\FunctionTok{unlist}\NormalTok{(estimates\_p1))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+          Diff-in-Diff      Synthetic Control Synthetic Diff-in-Diff 
+              32.21775               36.37194               14.88871 
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot 1: Trends of treated vs. synthetic control}
+\FunctionTok{synthdid\_plot}\NormalTok{(estimates\_p1, }\AttributeTok{facet.vertical =} \ConstantTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/DiD, SC, and SDID analyses for Product 1-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot 2: See which control stores received the highest weights}
+\FunctionTok{synthdid\_units\_plot}\NormalTok{(estimates\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/DiD, SC, and SDID analyses for Product 1-2.pdf}}
+
+\subsubsection{Product 2: p2sales}\label{product-2-p2sales}
+
+The same steps as for Product 1 are repeated for Product 2.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Setup panel matrices for Product 2}
+\NormalTok{setup\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{panel.matrices}\NormalTok{(}
+\NormalTok{  df,}
+  \AttributeTok{unit =} \StringTok{"storeNum"}\NormalTok{,}
+  \AttributeTok{time =} \StringTok{"Weekind"}\NormalTok{,}
+  \AttributeTok{outcome =} \StringTok{"p2sales"}\NormalTok{,}
+  \AttributeTok{treatment =} \StringTok{"treated"}
+\NormalTok{)}
+
+\CommentTok{\# Estimate the treatment effects for Product 2}
+\NormalTok{sdid\_est\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p2}\SpecialCharTok{$}\NormalTok{Y, setup\_p2}\SpecialCharTok{$}\NormalTok{N0, setup\_p2}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{did\_est\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{did\_estimate}\NormalTok{(setup\_p2}\SpecialCharTok{$}\NormalTok{Y, setup\_p2}\SpecialCharTok{$}\NormalTok{N0, setup\_p2}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{sc\_est\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{sc\_estimate}\NormalTok{(setup\_p2}\SpecialCharTok{$}\NormalTok{Y, setup\_p2}\SpecialCharTok{$}\NormalTok{N0, setup\_p2}\SpecialCharTok{$}\NormalTok{T0)}
+\NormalTok{estimates\_p2 }\OtherTok{=} \FunctionTok{list}\NormalTok{(did\_est\_p2, sc\_est\_p2, sdid\_est\_p2)}
+
+\CommentTok{\# Print the estimates}
+\FunctionTok{names}\NormalTok{(estimates\_p2) }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}Diff{-}in{-}Diff\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Synthetic Control\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Synthetic Diff{-}in{-}Diff\textquotesingle{}}\NormalTok{)}
+\FunctionTok{print}\NormalTok{(}\FunctionTok{unlist}\NormalTok{(estimates\_p2))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+          Diff-in-Diff      Synthetic Control Synthetic Diff-in-Diff 
+             -22.25818              -25.97635              -42.64470 
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot 1: Trends of treated vs. synthetic control}
+\FunctionTok{synthdid\_plot}\NormalTok{(estimates\_p2, }\AttributeTok{facet.vertical =} \ConstantTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/DiD, SC, and SDID analyses for Product 2-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot 2: See which control stores received the highest weights}
+\FunctionTok{synthdid\_units\_plot}\NormalTok{(estimates\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/DiD, SC, and SDID analyses for Product 2-2.pdf}}
+
+\section{Expensions to the analysis}\label{expensions-to-the-analysis}
+
+Two possible expansions to the analysis include:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Running a panel regression-based difference-in-differences model that
+  includes relevant covariates for ``pooling''. This implies that it
+  treats the entire dataset as a single pool of observations and uses
+  Ordinary Least Squares (OLS) to estimate the coefficients for dummy
+  veriables to handle store-level and time-period variation.
+\item
+  Implementing a version of the SDID method that first regresses out the
+  effects of price and promotions (using the Frisch-Waugh-Lovell
+  theorem) before applying the SDID estimator to the residuals. This
+  will allow us to see how controlling for these covariates in a more
+  flexible way (without assuming linearity or additivity) affects the
+  estimates and their precision.
+\end{enumerate}
+
+\subsection{Panel regression
+difference-in-differences}\label{panel-regression-difference-in-differences}
+
+To further explore the data, we can also run a panel regression with a
+difference-in-differences specification that includes the relevant
+covariates. This will allow us to compare the results from this more
+traditional econometric approach with the estimates obtained from the
+SDID method.
+
+\subsubsection{Product 1: Panel DiD WITH
+Covariates}\label{product-1-panel-did-with-covariates}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{did\_cov\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{plm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ is\_treated\_store }\SpecialCharTok{+}\NormalTok{ post\_treatment }\SpecialCharTok{+}\NormalTok{ treated }\SpecialCharTok{+} 
+\NormalTok{                            p1price }\SpecialCharTok{+}\NormalTok{ p1prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }
+                  \AttributeTok{data =}\NormalTok{ pdf, }
+                  \AttributeTok{model =} \StringTok{"pooling"}\NormalTok{)}
+\FunctionTok{summary}\NormalTok{(did\_cov\_p1)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Pooling Model
+
+Call:
+plm(formula = p1sales ~ is_treated_store + post_treatment + treated + 
+    p1price + p1prom + compind + storesize + citysize, data = pdf, 
+    model = "pooling")
+
+Balanced Panel: n = 21, T = 104, N = 2184
+
+Residuals:
+     Min.   1st Qu.    Median   3rd Qu.      Max. 
+-50.36165  -5.27904   0.36831   5.32015  44.24457 
+
+Coefficients:
+                    Estimate  Std. Error  t-value  Pr(>|t|)    
+(Intercept)       2.0488e+02  2.1580e+00  94.9419 < 2.2e-16 ***
+is_treated_store -3.3633e+01  1.3414e+00 -25.0730 < 2.2e-16 ***
+post_treatment    3.5381e+00  5.5270e-01   6.4015 1.879e-10 ***
+treated           2.9974e+01  2.5287e+00  11.8535 < 2.2e-16 ***
+p1price          -2.5853e+00  7.7822e-01  -3.3220 0.0009085 ***
+p1prom            3.7619e+01  5.9851e-01  62.8544 < 2.2e-16 ***
+compind           9.3823e+01  6.8649e-01 136.6696 < 2.2e-16 ***
+storesize         1.2244e+00  7.8548e-03 155.8758 < 2.2e-16 ***
+citysize          1.0299e-04  1.0029e-06 102.7016 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Total Sum of Squares:    11379000
+Residual Sum of Squares: 264690
+R-Squared:      0.97674
+Adj. R-Squared: 0.97665
+F-statistic: 11416 on 8 and 2175 DF, p-value: < 2.22e-16
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Product 1: Covariate DiD with Clustered Standard Errors}
+\FunctionTok{coeftest}\NormalTok{(did\_cov\_p1, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p1, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+t test of coefficients:
+
+                    Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)       2.0488e+02  2.5912e+00  79.0685 < 2.2e-16 ***
+is_treated_store -3.3633e+01  1.0830e+00 -31.0553 < 2.2e-16 ***
+post_treatment    3.5381e+00  3.9689e+00   0.8915 0.3727792    
+treated           2.9974e+01  4.0396e+00   7.4198 1.672e-13 ***
+p1price          -2.5853e+00  7.8067e-01  -3.3116 0.0009428 ***
+p1prom            3.7619e+01  1.4219e+00  26.4564 < 2.2e-16 ***
+compind           9.3823e+01  3.3419e-01 280.7499 < 2.2e-16 ***
+storesize         1.2244e+00  2.0424e-03 599.4855 < 2.2e-16 ***
+citysize          1.0299e-04  2.7410e-07 375.7586 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\subsubsection{Product 2: Panel DiD WITH
+Covariates}\label{product-2-panel-did-with-covariates}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{did\_cov\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{plm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ is\_treated\_store }\SpecialCharTok{+}\NormalTok{ post\_treatment }\SpecialCharTok{+}\NormalTok{ treated }\SpecialCharTok{+} 
+\NormalTok{                            p2price }\SpecialCharTok{+}\NormalTok{ p2prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }
+                  \AttributeTok{data =}\NormalTok{ pdf, }
+                  \AttributeTok{model =} \StringTok{"pooling"}\NormalTok{)}
+\FunctionTok{summary}\NormalTok{(did\_cov\_p2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Pooling Model
+
+Call:
+plm(formula = p2sales ~ is_treated_store + post_treatment + treated + 
+    p2price + p2prom + compind + storesize + citysize, data = pdf, 
+    model = "pooling")
+
+Balanced Panel: n = 21, T = 104, N = 2184
+
+Residuals:
+     Min.   1st Qu.    Median   3rd Qu.      Max. 
+-67.46766  -6.34606   0.14586   6.03922  53.12151 
+
+Coefficients:
+                    Estimate  Std. Error t-value  Pr(>|t|)    
+(Intercept)       1.5259e+02  2.5743e+00  59.276 < 2.2e-16 ***
+is_treated_store -1.8371e+01  1.6208e+00 -11.335 < 2.2e-16 ***
+post_treatment    2.9050e+00  6.6751e-01   4.352 1.411e-05 ***
+treated          -3.4354e+01  3.0600e+00 -11.227 < 2.2e-16 ***
+p2price          -2.8813e+00  8.6397e-01  -3.335 0.0008673 ***
+p2prom            8.9915e+01  7.7995e-01 115.284 < 2.2e-16 ***
+compind           9.4394e+01  8.3034e-01 113.681 < 2.2e-16 ***
+storesize         2.0648e+00  9.5007e-03 217.331 < 2.2e-16 ***
+citysize          2.0847e-04  1.2128e-06 171.898 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Total Sum of Squares:    28441000
+Residual Sum of Squares: 387230
+R-Squared:      0.98638
+Adj. R-Squared: 0.98633
+F-statistic: 19696.6 on 8 and 2175 DF, p-value: < 2.22e-16
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Product 2: Covariate DiD with Clustered Standard Errors}
+\FunctionTok{coeftest}\NormalTok{(did\_cov\_p2, }\AttributeTok{vcov =} \FunctionTok{vcovHC}\NormalTok{(did\_cov\_p2, }\AttributeTok{type =} \StringTok{"HC1"}\NormalTok{, }\AttributeTok{cluster =} \StringTok{"group"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+t test of coefficients:
+
+                    Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)       1.5259e+02  2.3256e+00  65.6149 < 2.2e-16 ***
+is_treated_store -1.8371e+01  1.1091e+00 -16.5636 < 2.2e-16 ***
+post_treatment    2.9050e+00  4.0676e+00   0.7142    0.4752    
+treated          -3.4354e+01  4.4606e+00  -7.7016 2.025e-14 ***
+p2price          -2.8813e+00  7.2146e-01  -3.9938 6.719e-05 ***
+p2prom            8.9915e+01  4.7046e+00  19.1123 < 2.2e-16 ***
+compind           9.4394e+01  1.9037e-01 495.8359 < 2.2e-16 ***
+storesize         2.0648e+00  3.7319e-03 553.2849 < 2.2e-16 ***
+citysize          2.0847e-04  3.5877e-07 581.0723 < 2.2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\subsection{Synthetic DiD regressing out the
+covariates}\label{synthetic-did-regressing-out-the-covariates}
+
+Given that the base synthdid package used does not easily accept
+additional control variables (like price and promotions) directly into
+its primary matrix setup, we can implement a solution based on the
+Frisch-Waugh-Lovell (FWL) theorem: we first use a linear regression to
+predict sales based only on the covariates, extract the residuals (the
+portion of sales unexplained by price, promotions, etc.), and then apply
+the SDID model to those residuals.
+
+By adding the overall mean back to the residuals, we keep the
+interpretation on the same scale as the original sales volume.
+
+\subsubsection{Product 1: p1sales}\label{product-1-p1sales-1}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Run a linear model and extract the residuals (unexplained sales)}
+\NormalTok{model\_p1 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p1sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p1price }\SpecialCharTok{+}\NormalTok{ p1prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }\AttributeTok{data =}\NormalTok{ df)}
+\NormalTok{df}\SpecialCharTok{$}\NormalTok{p1sales\_adj }\OtherTok{\textless{}{-}} \FunctionTok{residuals}\NormalTok{(model\_p1) }\SpecialCharTok{+} \FunctionTok{mean}\NormalTok{(df}\SpecialCharTok{$}\NormalTok{p1sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+
+\CommentTok{\# Setup panel matrices using the NEW adjusted outcome variable}
+\NormalTok{setup\_p1\_adj }\OtherTok{\textless{}{-}} \FunctionTok{panel.matrices}\NormalTok{(}
+\NormalTok{  df,}
+  \AttributeTok{unit =} \StringTok{"storeNum"}\NormalTok{,}
+  \AttributeTok{time =} \StringTok{"Weekind"}\NormalTok{,}
+  \AttributeTok{outcome =} \StringTok{"p1sales\_adj"}\NormalTok{, }
+  \AttributeTok{treatment =} \StringTok{"treated"}
+\NormalTok{)}
+
+\CommentTok{\# Estimate the adjusted SDID Treatment Effect}
+\NormalTok{sdid\_est\_p1\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{Y, setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{N0, setup\_p1\_adj}\SpecialCharTok{$}\NormalTok{T0)}
+\FunctionTok{print}\NormalTok{(sdid\_est\_p1\_adj)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+synthdid: 18.519 +- NA. Effective N0/N0 = 14.1/20~0.7. Effective T0/T0 = 1.6/77~0.0. N1,T1 = 1,27. 
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Calculate and print confidence intervals for Product 1}
+\NormalTok{se\_p1\_adj }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{vcov}\NormalTok{(sdid\_est\_p1\_adj, }\AttributeTok{method =} \StringTok{"placebo"}\NormalTok{))}
+\FunctionTok{cat}\NormalTok{(}\FunctionTok{sprintf}\NormalTok{(}\StringTok{"Adjusted 95\%\% CI: [\%.2f, \%.2f]}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }
+\NormalTok{            sdid\_est\_p1\_adj }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se\_p1\_adj, }
+\NormalTok{            sdid\_est\_p1\_adj }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se\_p1\_adj))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Adjusted 95% CI: [12.24, 24.79]
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Visualize adjusted trends}
+\FunctionTok{plot}\NormalTok{(sdid\_est\_p1\_adj)}\SpecialCharTok{+}\FunctionTok{theme\_minimal}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/Regressing out covariates for Product 1-1.pdf}}
+
+\subsubsection{Product 2: p2sales}\label{product-2-p2sales-1}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Run a linear model and extract the residuals (unexplained sales)}
+\NormalTok{model\_p2 }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(p2sales }\SpecialCharTok{\textasciitilde{}}\NormalTok{ p2price }\SpecialCharTok{+}\NormalTok{ p2prom }\SpecialCharTok{+}\NormalTok{ compind }\SpecialCharTok{+}\NormalTok{ storesize }\SpecialCharTok{+}\NormalTok{ citysize, }\AttributeTok{data =}\NormalTok{ df)}
+\NormalTok{df}\SpecialCharTok{$}\NormalTok{p2sales\_adj }\OtherTok{\textless{}{-}} \FunctionTok{residuals}\NormalTok{(model\_p2) }\SpecialCharTok{+} \FunctionTok{mean}\NormalTok{(df}\SpecialCharTok{$}\NormalTok{p2sales, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{)}
+
+\CommentTok{\# Setup panel matrices using the NEW adjusted outcome variable}
+\NormalTok{setup\_p2\_adj }\OtherTok{\textless{}{-}} \FunctionTok{panel.matrices}\NormalTok{(}
+\NormalTok{  df,}
+  \AttributeTok{unit =} \StringTok{"storeNum"}\NormalTok{,}
+  \AttributeTok{time =} \StringTok{"Weekind"}\NormalTok{,}
+  \AttributeTok{outcome =} \StringTok{"p2sales\_adj"}\NormalTok{, }
+  \AttributeTok{treatment =} \StringTok{"treated"}
+\NormalTok{)}
+
+\CommentTok{\# Estimate the adjusted SDID Treatment Effect}
+\NormalTok{sdid\_est\_p2\_adj }\OtherTok{\textless{}{-}} \FunctionTok{synthdid\_estimate}\NormalTok{(setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{Y, setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{N0, setup\_p2\_adj}\SpecialCharTok{$}\NormalTok{T0)}
+\FunctionTok{print}\NormalTok{(sdid\_est\_p2\_adj)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+synthdid: -42.649 +- NA. Effective N0/N0 = 16.2/20~0.8. Effective T0/T0 = 4.2/77~0.1. N1,T1 = 1,27. 
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Calculate and print confidence intervals for Product 2}
+\NormalTok{se\_p2\_adj }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{vcov}\NormalTok{(sdid\_est\_p2\_adj, }\AttributeTok{method =} \StringTok{"placebo"}\NormalTok{))}
+\FunctionTok{cat}\NormalTok{(}\FunctionTok{sprintf}\NormalTok{(}\StringTok{"Adjusted 95\%\% CI: [\%.2f, \%.2f]}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{, }
+\NormalTok{            sdid\_est\_p2\_adj }\SpecialCharTok{{-}} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se\_p2\_adj, }
+\NormalTok{            sdid\_est\_p2\_adj }\SpecialCharTok{+} \FloatTok{1.96} \SpecialCharTok{*}\NormalTok{ se\_p2\_adj))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Adjusted 95% CI: [-56.00, -29.30]
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Visualize adjusted trends}
+\FunctionTok{plot}\NormalTok{(sdid\_est\_p2\_adj)}\SpecialCharTok{+}\FunctionTok{theme\_minimal}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{Portfolio_Task_4_files/figure-pdf/Regressing out covariates for Product 2-1.pdf}}
+
+\section{Summary of Findings}\label{summary-of-findings}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.4444}}
+  >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1806}}
+  >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.0972}}
+  >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1806}}
+  >{\centering\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.0972}}@{}}
+\caption{Comparison of Treatment Effect Estimates for Product 1 and
+Product 2}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Model
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P1 Estimate
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P1 SE
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P2 Estimate
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P2 SE
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Model
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P1 Estimate
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P1 SE
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P2 Estimate
+\end{minipage} & \begin{minipage}[b]{\linewidth}\centering
+P2 SE
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Pre-Post (LM) & 33.69 & 1.71 & -29.71 & 1.87 \\
+Two-Way Fixed Effects (TWFE) & 29.98 & 4.03 & -34.29 & 4.45 \\
+Difference-in-Differences (DID) & 32.22 & 19.63 & -22.26 & 20.08 \\
+Panel DID (with Covariates) & 29.97 & 4.04 & -34.35 & 4.46 \\
+Synthetic Control (SC) & 36.37 & 13.31 & -25.98 & 30.90 \\
+Synthetic DID (SDID) & 14.89 & 8.85 & -42.64 & 10.08 \\
+Adjusted SDID (with Covariates) & 18.52 & 3.40 & -42.65 & 6.25 \\
+\end{longtable}
+
+\subsection{Conclusions}\label{conclusions}
+
+\subsubsection{Pre-Post Analysis}\label{pre-post-analysis}
+
+In the Pre-Post analysis of Store 109, the pre-post model yielded the
+following estimates:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} A significant increase of approximately 33.69
+  units \((p<0.001)\)
+\item
+  \textbf{Product 2:} A significant decrease of approximately 29.71
+  units \((p<0.001)\)
+\end{itemize}
+
+While these numbers provide a clear description of the sales change at
+Store 109, they are only ``appropriate'' causal estimates if no other
+external factors influenced sales between the pre- and post-treatment
+weeks. If, for example, a competitor ran a major promotion on Product 2
+during the same week as the treatment, the pre-post model would wrongly
+conclude that the in-store marketing caused the sales drop. Therefore,
+while useful for initial descriptive analysis, more advanced methods
+like the Two-Way Fixed Effect (TWFE) model or Synthetic Control are
+generally more appropriate for establishing causality in this dataset as
+they account for time-varying aggregate shocks.
+
+\subsubsection{Two-Way Fixed Effects (TWFE)
+Analysis}\label{two-way-fixed-effects-twfe-analysis}
+
+In the Two-Way Fixed Effects analysis of Store 109, the TWFE model
+provided more nuanced estimates compared to the naive Pre-Post model:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} The TWFE estimate was 29.98 units (SE: 4.03),
+  slightly lower and more conservative than the Pre-Post estimate of
+  33.69
+\item
+  \textbf{Product 2:} The TWFE estimate was -34.29 units (SE: 4.45),
+  showing a more pronounced decrease than the Pre-Post estimate of
+  -29.71
+\end{itemize}
+
+These differences highlight that the TWFE model is more appropriate than
+the Pre-Post model because it adjusts for weekly sales fluctuations
+across the entire retail chain, preventing those general trends from
+being incorrectly attributed to the specific in-store marketing
+treatment.
+
+\subsubsection{Difference-in-Differences (DID)
+Analysis}\label{difference-in-differences-did-analysis}
+
+In the Difference-in-Differences analysis of Store 109, the simple DID
+model provided the following results:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} Estimate of 32.22 units (SE: 19.88)
+\item
+  \textbf{Product 2:} Estimate of -22.26 units (SE: 20.14)
+\end{itemize}
+
+Notably, the standard errors for the simple DID in this specific task
+were significantly larger than those of the Two-Way Fixed Effects (TWFE)
+or Adjusted SDID models. This suggests that while a simple DID is a
+theoretical improvement over a pre-post model, it may lack precision in
+datasets with high variance between stores unless more granular controls
+(like fixed effects or matching) are incorporated. While these additions
+could possibly reduce the standard errors, by looking at the graph, we
+can see that the data does not follow the parallel trends assumption
+very well, which is likely contributing to the large standard errors.
+Therefore, while the simple DID is a step in the right direction for
+causal inference, it may not be the most appropriate method for this
+dataset without further adjustments.
+
+\subsubsection{Panel DiD with Covariates
+Analysis}\label{panel-did-with-covariates-analysis}
+
+In the Panel DiD with Covariates analysis of Store 109, the model
+provided the following estimates:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} Estimate of 29.97 units (SE: 4.04)
+\item
+  \textbf{Product 2:} Estimate of -34.35 units (SE: 4.46)
+\end{itemize}
+
+The estimates for Product 1 (29.98 vs 29.97) and Product 2 (-34.29 vs
+-34.35) are almost identical to the TWFE model's estimates. This
+indicates that the explicit covariates included in the Panel DID model
+successfully captured nearly all the systematic store-level differences
+that the TWFE model's fixed effects would have absorbed. Also like the
+TWFE model, the Panel DiD with Covariates model shows very high
+precision (SEs \textasciitilde4.0) compared to a Simple DID (SEs
+\textasciitilde20.0). This is posibly because both models include prices
+and promotions as covariates, which tend to have noticeable impact on
+sales volume. By explaining this variance, both models significantly
+reduce the noise in the residuals. With that said, the Simple TWFE model
+is generally considered more robust because it controls for all store
+characteristics, even those that are not seen or measured. If there were
+an unobserved store difference not captured by \emph{citysize} or
+\emph{storesize}, the pooling model could be biased. However, the
+near-identical results suggest that these covariates were comprehensive
+for this specific task.
+
+\subsubsection{Synthetic Control (SC)
+Analysis}\label{synthetic-control-sc-analysis}
+
+In the Synthetic Control analysis of Store 109, the SC model provided
+the following estimates:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} Estimate of 36.37 units (SE: 11.83)
+\item
+  \textbf{Product 2:} Estimate of -25.98 units (SE: 33.54)
+\end{itemize}
+
+While SC provided the highest positive estimate for Product 1, its
+standard errors in this specific task were notably larger than those of
+more advanced hybrid methods like Synthetic DID (SDID) or Two-Way Fixed
+Effects (TWFE). This also aligns with the visual inspection of the
+trends, where the synthetic control had a reasonable pre-treatment fit
+but due to the high amount of noise in the data, the post-treatment
+estimate is less precise and potentially overfitted. This suggests that
+while SC is appropriate for defining the counterfactual based on
+pre-treatment trends, its precision can be lower in retail panels unless
+combined with additional regularization or time-weighting (as seen in
+SDID).
+
+\subsubsection{Synthetic Difference-in-Differences (SDID) and Adjusted
+SDID
+Analysis}\label{synthetic-difference-in-differences-sdid-and-adjusted-sdid-analysis}
+
+In the Synthetic Difference-in-Differences analysis of Store 109, the
+SDID models provided the following estimates:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} Pure SDID Estimate of 14.89 (SE: 8.63)
+\item
+  \textbf{Product 2:} Pure SDID Estimate of -42.64 (SE: 10.14)
+\item
+  \textbf{Product 1:} Adjusted SDID Estimate of 18.52 (SE: 3.64)
+\item
+  \textbf{Product 2:} Adjusted SDID Estimate of -42.65 (SE: 6.80)
+\end{itemize}
+
+\textbf{Precision:} The Adjusted SDID yielded the smallest standard
+errors for both products. This was achieved by using the
+Frisch-Waugh-Lovell (FWL) theorem to first ``regress out'' the effects
+of prices and promotions before applying the SDID estimator.
+
+\textbf{Conservatism vs.~Magnitude:} For Product 1, the SDID estimate
+(18.52) was significantly more conservative than the naive Pre-Post
+(33.69) or simple DID (32.22) models. This suggests that earlier models
+were likely overestimating the marketing effect by failing to account
+for specific control units that shared Store 109's unique sales
+trajectory.
+
+\textbf{Reliability:} For Product 2, the SDID estimate (-42.65) showed a
+much stronger negative impact than the simple DID (-22.26). This
+indicates that when control units are reweighted to match the treated
+store's specific behavior, the sales drop appears even more severe.
+
+\textbf{Final considerations:} The SDID approach, especially when
+adjusted for covariates, appears to provide the most reliable and
+precise estimates of the treatment effect in this retail panel context.
+It effectively combines the strengths of both SC (defining a data-driven
+counterfactual) and DID (leveraging time variation), while also
+controlling for confounding factors through regression adjustment.
+However it is very important to consider: because SDID often weights
+only a few time periods directly before the treatment, the estimate can
+be sensitive to noise in those specific weeks; to prevent over-reliance
+on a single control unit and ensure a unique solution, SDID uses a
+regularization constant (ξ) to disperse unit weights; similar to SC, the
+credibility of SDID rests on the quality of the pre-treatment fit; if
+the weighted controls cannot reasonably mimic the treated unit's trend,
+the resulting estimate may be biased. With those considerations in mind,
+the SDID method, particularly when adjusted for covariates, appears to
+be the most appropriate and reliable method for estimating the causal
+effect of the in-store marketing strategy on sales in this dataset.
+
+\subsection{Final decision:}\label{final-decision}
+
+\subsubsection{Recommendations to
+Management}\label{recommendations-to-management}
+
+The primary recommendation is to proceed with caution regarding a
+full-scale rollout of this marketing strategy. While the strategy
+successfully drives sales for Product 1, it appears to have a
+significant negative impact on Product 2 sales. Management should
+investigate whether this represents a ``cannibalization'' effect or if
+the marketing for Product 1 is actively deterring Product 2 purchases.
+Before a chain-wide implementation, it is essential to calculate the net
+profit margin of these changes, as the volume loss in Product 2
+(\textasciitilde42 units) is more than double the volume gain in Product
+1 (\textasciitilde18 units)
+
+\subsubsection{Effectiveness and Expected Sales
+Uplift}\label{effectiveness-and-expected-sales-uplift}
+
+Based on the most precise and realiable model {[}\emph{Adjusted
+Synthetic DID (SDID)}{]} the strategy is effective at changing sales
+levels, but the direction varies by product:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Product 1:} You can expect a statistically significant
+  expected uplift of approximately 18.52 units per week (SE: 3.64). This
+  estimate is more reliable and conservative than the naive pre-post
+  estimate (33.69), which likely overestimated the effect by failing to
+  account for general market trends.
+\item
+  \textbf{Product 2:} You should expect a statistically significant
+  decrease of approximately 42.65 units per week (SE: 6.80). This
+  negative impact is substantial and was consistent across all advanced
+  models (TWFE and SDID).
+\end{itemize}
+
+\subsubsection{Potential Challenges in the
+Data}\label{potential-challenges-in-the-data}
+
+Several characteristics of the retail dataset pose challenges to
+established causal inference:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Violation of Parallel Trends:} Visual inspection and the high
+  standard errors in the simple DID model (\textasciitilde20.0) suggest
+  that Store 109 did not follow the same pre-treatment trajectory as the
+  average of the control stores. Relying on simple models would
+  therefore lead to biased estimates.
+\item
+  \textbf{Independent Price Setting:} Because store managers set prices
+  independently at each store, price becomes an endogenous factor that
+  varies over both time and units. If these price changes coincide with
+  the marketing treatment, they can confound the results.
+\item
+  \textbf{Selection Bias:} The treatment was not randomized; Store 109
+  was specifically chosen. This introduces ``selection on
+  unobservables,'' where unique characteristics of that store (e.g.,
+  local management culture) might make it more or less responsive to
+  marketing than other stores.
+\end{itemize}
+
+\subsubsection{Ideas to Overcome These
+Challenges}\label{ideas-to-overcome-these-challenges}
+
+To address the data challenges identified, the following methodological
+approaches were implemented:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Weighted Counterfactuals (SDID):} To overcome the lack of
+  parallel trends, Synthetic DID was used, which reweights control
+  stores and pre-treatment weeks to create a custom ``synthetic'' match
+  that specifically mimics Store 109's unique trajectory.
+\item
+  \textbf{Frisch-Waugh-Lovell (FWL) Theorem:} The impact of prices and
+  promotions were addressed by ``regressing them out'' before performing
+  the causal estimation. This isolation of the marketing effect
+  significantly improved precision, reducing standard errors for Product
+  1 from 18.50 (Simple DID) to 3.47 (Adjusted SDID).
+\item
+  \textbf{Two-Way Fixed Effects:} By including store and time fixed
+  effects, we controlled for all stable store characteristics and
+  national-level shocks (like holidays), solving the endogeneity problem
+  for any factors that are either subject-invariant or time-invariant.
+\end{itemize}
+
+
+
+
+\end{document}
