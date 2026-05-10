@@ -34,7 +34,7 @@ library(xgboost)
 
 # Import Data
 ```{r}
-casedata_task3 <- read.csv("Task 3\\CaseData_Task3.csv", stringsAsFactors = FALSE)
+casedata_task3 <- read.csv("CaseData_Task3.csv", stringsAsFactors = FALSE)
 
 # Display the structure of the data to verify column names
 str(casedata_task3)
@@ -51,7 +51,7 @@ model_adj <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 +
                  X11 + X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
                  data = casedata_task3)
 
-summary(model_adj)
+coeftest(model_adj)["d", , drop = FALSE]
 ```
 
 Extract the ATE value from the regression and calculate robust standard errors using the HC3 estimator, which is more reliable in small samples and with heteroskedasticity.
@@ -61,7 +61,7 @@ coeftest(model_adj, vcov = vcovHC(model_adj, type = "HC3"))
 ```{r}
 #| echo: false
 ate <- coef(model_adj)["d"]
-cat("The estimated Average Treatment Effect (ATE) for the treatment is:", ate, "\n")
+cat(sprintf("The estimated Average Treatment Effect (ATE) for the treatment is: $%.2f\n", ate))
 ```
 
 # Propensity Score Estimation and Overlap Diagnostic
@@ -114,7 +114,6 @@ match_no_replace <- matchit(ps_formula,
                             ratio = 1)          # 1:1 matching
 
 # View a summary to check covariate balance (ideally Std. Mean Diff < 0.1)
-cat("Balance Summary (Without Replacement):\n")
 print(summary(match_no_replace, un = FALSE))
 
 # Extract the matched dataset
@@ -139,18 +138,20 @@ print(coeftest(model_no_replace, vcov. = vcovHC))
 ```{r}
 #| echo: false
 att <- coef(model_no_replace)["d"]
-cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+cat(sprintf("The estimated Average Treatment Effect on the Treated for the treatment is (ATT): $%.2f\n", att))
 ```
 
 ## 1:1 Nearest Neighbor Matching WITH Replacement
 <!-- Use get_matches() instead of match.data() when matching WITH replacement 
 to properly duplicate rows that are used as matches multiple times. -->
 ```{r}
-match_with_replace <- matchit(ps_formula, 
-                              data = casedata_task3, 
-                              method = "nearest", 
+match_with_replace <- matchit(ps_formula,
+                              data = casedata_task3,
+                              method = "nearest",
                               distance = "glm",
                               replace = TRUE,     # With replacement
+                              caliper = 0.2,      # Cap match distance at 0.2 SDs of PS
+                              std.caliper = TRUE,
                               ratio = 1)
 
 # Balance Summary (With Replacement)
@@ -175,7 +176,7 @@ print(coeftest(model_with_replace, vcov. = vcovCL, cluster = ~subclass))
 ```{r}
 #| echo: false
 att <- coef(model_with_replace)["d"]
-cat("The estimated Average Treatment Effect on the Treated for the treatment is (ATT):", att, "\n")
+cat(sprintf("The estimated Average Treatment Effect on the Treated for the treatment is (ATT): $%.2f\n", att))
 ```
 
 **Assessing the Need for Regression Adjustment** To evaluate the redundancy of including covariates after matching, I compared the "doubly robust" model (which includes all 20 covariates in the final regression) against a "simple matched model" that uses only the treatment indicator on the matched sample.
@@ -188,7 +189,7 @@ model_simple_matched <- lm(y ~ d,
                            weights = weights)
 
 # Summary of the simple model
-summary(model_simple_matched)
+coeftest(model_simple_matched)["d", , drop = FALSE]
 ```
 ```{r}
 #| echo: false
@@ -196,11 +197,11 @@ summary(model_simple_matched)
 # Extract the ATT (coefficient for d)
 att_simple <- coef(model_simple_matched)["d"]
 
-cat("Simple Matched ATT:", att_simple, "\n")
-cat("Doubly Robust ATT:", att, "\n")
+cat(sprintf("Simple Matched ATT: $%.2f\n", att_simple))
+cat(sprintf("Doubly Robust ATT: $%.2f\n", att))
 ```
 
-As made evident by the highly innacurate ATT measure of the simple matched model, the simple matched model's ATT is quite different from the doubly robust version (-10.3 vs. 23.3), which suggests that the matching alone didn't achieve good balance and the regression adjustment is still doing important work to control for confounding.
+As made evident by the highly innacurate ATT measure of the simple matched model, the simple matched model's ATT is quite different from the doubly robust version (-$10.30 vs. $23.30), which suggests that the matching alone didn't achieve good balance and the regression adjustment is still doing important work to control for confounding.
 
 ## Euclidean Distance Matching
 ```{r}
@@ -224,10 +225,10 @@ lm_euc <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 +
 
 Extract the ATT value and calculate robust standard errors using the HC3 estimator
 ```{r}
-summary(lm_euc)
+coeftest(lm_euc)["d", , drop = FALSE]
 
-# Robust Standard Errors (Euclidean Matching):
-print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3")))
+# Robust Standard Errors (Euclidean Matching) — treatment row only
+print(coeftest(lm_euc, vcov. = vcovHC(lm_euc, type = "HC3"))["d", , drop = FALSE])
 ```
 
 ### Comparing matching quality across methods
@@ -259,7 +260,7 @@ estimate_ipw_ate <- function(data, trim = 0.01) {
 #    ATE = mean( y * ( d/ps - (1-d)/(1-ps) ) )
 ate_ipw_manual <- estimate_ipw_ate(df_ipw, trim = 0.01)
 
-cat("\nManual IPW ATE (primary estimate):", round(ate_ipw_manual, 4), "\n")
+cat(sprintf("\nManual IPW ATE (primary estimate): $%.2f\n", ate_ipw_manual))
 
 # 4) Bootstrap inference for the full two-step IPW estimator:
 #    re-sample rows, re-estimate propensity model, re-calculate ATE each draw.
@@ -311,12 +312,12 @@ lm_ipw <- lm(y ~ d + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 +
              X12 + X13 + X14 + X15 + X16 + X17 + X18 + X19 + X20,
              data = df_ipw, weights = ipw_weight)
 
-print(summary(lm_ipw))
-print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3")))
+print(coeftest(lm_ipw)["d", , drop = FALSE])
+print(coeftest(lm_ipw, vcov. = vcovHC(lm_ipw, type = "HC3"))["d", , drop = FALSE])
 ```
 
 ## IPW Critical Discussion Points
-The manual IPW estimate came out at around −318, which obviously doesn't make sense for a sales effect and is likely due to its sensitivity to poor overlap. The weighted regression version (~15.81) does much better because the regression component doesn't rely purely on the weights. It also shows why AIPW and DML are generally more appealing: they don't put all their eggs in the weighting basket.
+The manual IPW estimate came out at around −$318, which obviously doesn't make sense for a sales effect and is likely due to its sensitivity to poor overlap. The weighted regression version (~$15.81) does much better because the regression component doesn't rely purely on the weights. It also shows why AIPW and DML are generally more appealing: they don't put all their eggs in the weighting basket.
 
 # Augmented Inverse Probability Weighting (AIPW) - Manual Estimation
 This section implements AIPW manually using the doubly robust score:
@@ -379,7 +380,7 @@ estimate_aipw_ate <- function(data, covariate_names, trim = 0.01) {
 
 # Point estimate
 aipw_ate <- estimate_aipw_ate(df_aipw, covariates, trim = 0.01)
-cat("Manual AIPW ATE estimate:", round(aipw_ate, 4), "\n")
+cat(sprintf("Manual AIPW ATE estimate: $%.2f\n", aipw_ate))
 
 # 4) Bootstrap inference for AIPW
 set.seed(123)
@@ -420,6 +421,10 @@ kable(aipw_summary_df,
 - Efficiency: Compared with simple IPW, AIPW is typically more stable and can achieve the semiparametric efficiency bound under correct specification.
 - Debiasing logic: The residual-weighted terms, $(Y - \hat{\mu})$, correct the regression predictions using inverse-probability weighting.
 - Overlap/common support: Propensity scores should stay away from 0 and 1; weak overlap creates extreme weights and unstable estimates, so diagnostics and trimming are important.
+
+Looking at where AIPW falls relative to the other ATE methods, the point estimate of $18.85 sits closest to DML-XGBoost at $18.35, while the linear methods — plain regression adjustment at $15.15 and DML-Lasso at $15.23 — come in around $3.50 lower. This is a consistent split: both flexible methods produce higher estimates and both linear methods produce lower ones. We read this as evidence that the covariate–outcome relationship has some non-linear structure that linear regression alone misses, and the residual term $(Y - \hat{\mu})$ in the AIPW score is partially picking it up where the linear $\hat{\mu}$ falls short.
+
+On the doubly-robust framing itself, it is worth noting that the manual IPW estimate blew up at −$318 in this dataset because of the weak overlap and the resulting extreme weights. AIPW at $18.85 sits much closer to plain regression adjustment ($15.15) than to manual IPW, which suggests that in this dataset the regression-adjustment side of AIPW is doing most of the work. The IPW correction term is not moving the estimate much, since the underlying weights are too unstable to push the answer in any one direction. The double-robustness property therefore functions more as a safety net against gross misspecification than as a meaningful correction here.
 
 # Double Machine Learning (DML): PLR with Cross-Fitting
 We now estimate the ATE with DoubleML using the partially linear regression model:
@@ -574,6 +579,10 @@ cat("\nBest-fitting nuisance combination (lower RMSE + LogLoss):",
 - Compared with weighting estimators, PLR-style partialling out avoids direct division by propensity scores, which can be more stable under weak overlap.
 - Even with ML-based nuisance models, causal validity still depends on conditional independence and excluding bad controls (e.g., colliders).
 
+Across the three nuisance learners, the PLR estimates span about $4.65 — from $13.70 (Random Forest) to $18.35 (XGBoost), with Lasso in between at $15.23. A spread that wide is not a small implementation detail; the choice of nuisance learner is moving the treatment-effect estimate by roughly a third of the smallest value. Lasso and XGBoost disagree by about $3, and Random Forest comes in even lower than the linear method, which is the more surprising piece since RF is also a flexible learner. We do not want to overinterpret this without further diagnostics, but it is consistent with RF over-smoothing on tabular data when there are relatively few samples per leaf. Either way, the cross-learner range is wide enough that we would hesitate to read any single DML estimate as the answer.
+
+On the selection rule, our combined RMSE + LogLoss criterion picked Lasso as the best-fitting nuisance combination, but XGBoost is the learner whose treatment-effect estimate sits closest to AIPW — i.e., closest to where the doubly-robust estimator places the answer. That is a tension worth flagging: predictive performance on the nuisance functions and where the treatment-effect estimate ends up are not the same thing, and one does not necessarily anchor the other. "Best-fitting nuisance" is a model-fit verdict; it does not automatically translate into "most accurate treatment effect." We use the predictive criterion as the rule for transparency, not because we believe it is decisive on its own.
+
 
 # Comparison of Treatment Effects Across Methods
 
@@ -721,8 +730,8 @@ One thing worth noting upfront is that every method used here relies on the same
 ## 1. Comparison of ATE vs. ATT Estimates
 An important thing to keep in mind when comparing the results is that not all methods estimate the same thing.
 
-* **ATE methods** (Regression, IPW, AIPW, DML) estimate the effect if the discount were given to everyone. Ignoring the broken manual IPW, these range from roughly **13.70 to 18.85**.
-* **ATT methods** (Matching) estimate the effect for the customers who actually got the discount, ranging from about **16.16 to 23.25**.
+* **ATE methods** (Regression, IPW, AIPW, DML) estimate the effect if the discount were given to everyone. Ignoring the broken manual IPW, these range from roughly **$13.70 to $18.85**.
+* **ATT methods** (Matching) estimate the effect for the customers who actually got the discount, ranging from about **$16.16 to $23.25**.
 
 The ATT estimates being higher than the ATE could suggest that the customers who received the discount also happen to respond more strongly to it -- something like selection on returns. Though we're not 100% sure this isn't partly driven by differences in how the methods handle the data (e.g., the poor balance in the without-replacement matching might inflate things).
 
@@ -730,18 +739,18 @@ The ATT estimates being higher than the ATE could suggest that the customers who
 
 ## 2. Methodological Divergence and Instability
 
-* **IPW blowup:** The manual IPW gave −318, which is nonsense. we already discussed this above -- it's an overlap problem with extreme weights. The weighted regression IPW (~15.81) is much more reasonable since it doesn't rely only on the weights.
-* **Matching differences:** The without-replacement estimate (17.15) and with-replacement estimate (23.25) are pretty far apart. Given the balance diagnostics, we'd trust the with-replacement version more -- the without-replacement matching left large SMDs on X10–X14, so those matched pairs weren't really comparable. The with-replacement version got balance mostly under control, though it comes with more variance from reusing controls.
+* **IPW blowup:** The manual IPW gave −$318, which is nonsense. we already discussed this above -- it's an overlap problem with extreme weights. The weighted regression IPW (~$15.81) is much more reasonable since it doesn't rely only on the weights.
+* **Matching differences:** The without-replacement estimate ($17.15) and with-replacement estimate ($23.25) are pretty far apart. Given the balance diagnostics, we'd trust the with-replacement version more -- the without-replacement matching left large SMDs on X10–X14, so those matched pairs weren't really comparable. The with-replacement version got balance mostly under control, though it comes with more variance from reusing controls.
 
 ---
 
 ## 3. The Role of Double Robustness and Machine Learning
 
-* **AIPW (18.85)** is doubly robust -- it stays consistent if either the propensity score model or the outcome model is right. In theory it should also be more efficient than plain IPW.
+* **AIPW ($18.85)** is doubly robust -- it stays consistent if either the propensity score model or the outcome model is right. In theory it should also be more efficient than plain IPW.
 * **DML** results vary by learner:
-    * XGBoost: 18.35
-    * Lasso: 15.23
-    * Random Forest: 13.70
+    * XGBoost: $18.35
+    * Lasso: $15.23
+    * Random Forest: $13.70
 
 The fact that XGBoost and AIPW land in a similar range (~18) is interesting -- it might mean there are some non-linearities in the covariate-outcome relationship that OLS misses but these methods pick up. The Random Forest estimate being lower is a bit puzzling and could reflect differences in how well the nuisance models fit.
 
