@@ -282,6 +282,49 @@ shown (the ``ghost'' impressions). The point of doing this is to deal
 with divergent delivery: both arms get selected for exposure by the same
 algorithmic rule, so they are comparable in exposure potential.
 
+Before laying out the notation, the table below splits the 50,000 users
+by assignment (\(T\)) and exposure opportunity
+(\texttt{exposed\ =\ impressions\ \textgreater{}\ 0} --- actual exposure
+on the treatment side, ghost-impression exposure on the control side).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{exposed }\OtherTok{\textless{}{-}}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{impressions }\SpecialCharTok{\textgreater{}} \DecValTok{0}
+\NormalTok{cells }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{(}
+\NormalTok{  data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0} \SpecialCharTok{\&} \SpecialCharTok{!}\NormalTok{exposed,}
+\NormalTok{  data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{0} \SpecialCharTok{\&}\NormalTok{  exposed,}
+\NormalTok{  data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1} \SpecialCharTok{\&} \SpecialCharTok{!}\NormalTok{exposed,}
+\NormalTok{  data}\SpecialCharTok{$}\NormalTok{Z }\SpecialCharTok{==} \DecValTok{1} \SpecialCharTok{\&}\NormalTok{  exposed}
+\NormalTok{)}
+
+\NormalTok{sample\_structure }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{T           =} \FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{),}
+  \AttributeTok{exposed     =} \FunctionTok{c}\NormalTok{(}\ConstantTok{FALSE}\NormalTok{, }\ConstantTok{TRUE}\NormalTok{, }\ConstantTok{FALSE}\NormalTok{, }\ConstantTok{TRUE}\NormalTok{),}
+  \AttributeTok{n           =} \FunctionTok{sapply}\NormalTok{(cells, sum),}
+  \AttributeTok{conversions =} \FunctionTok{sapply}\NormalTok{(cells, }\ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{sum}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{Y[i])),}
+  \AttributeTok{conv\_rate   =} \FunctionTok{round}\NormalTok{(}\FunctionTok{sapply}\NormalTok{(cells, }\ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{Y[i])), }\DecValTok{4}\NormalTok{),}
+  \AttributeTok{total\_imps  =} \FunctionTok{sapply}\NormalTok{(cells, }\ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{sum}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[i])),}
+  \AttributeTok{avg\_imps    =} \FunctionTok{round}\NormalTok{(}\FunctionTok{sapply}\NormalTok{(cells, }\ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{mean}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{impressions[i])), }\DecValTok{4}\NormalTok{)}
+\NormalTok{)}
+\NormalTok{sample\_structure}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+  T exposed     n conversions conv_rate total_imps avg_imps
+1 0   FALSE  5382           0    0.0000          0   0.0000
+2 0    TRUE 19546         599    0.0306      79694   4.0773
+3 1   FALSE  5378           0    0.0000          0   0.0000
+4 1    TRUE 19694         719    0.0365      80249   4.0748
+\end{verbatim}
+
+The two \texttt{exposed\ =\ FALSE} cells have zero conversions because
+nobody actually saw an ad in either of those groups. The (T=0,
+exposed=TRUE) cell is the Ghost-Ads counterfactual; it sits at almost
+the same size and average impression count as the (T=1, exposed=TRUE)
+cell, which is what lets us run a direct ATET comparison on exposed
+users.
+
 Let \(Z_i \in \{0,1\}\) be assignment, \(M_i\) be impressions (actual
 for \(Z=1\), ghost for \(Z=0\)), and \(Y_i \in \{0,1\}\) be purchase.
 Actual treatment \(D_i\) is 1 only when \(Z_i = 1\) and \(M_i > 0\),

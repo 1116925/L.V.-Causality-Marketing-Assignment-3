@@ -44,6 +44,33 @@ head(data)
 
 The company ran a cookie-level randomised field experiment on 50,000 website visitors. Treatment-group visitors were eligible to see the focal ad and control-group visitors were not. Under the Ghost-Ads design, the ad-serving algorithm runs for both arms, and for control users the company records how many times the ad *would have been* shown (the "ghost" impressions). The point of doing this is to deal with divergent delivery: both arms get selected for exposure by the same algorithmic rule, so they are comparable in exposure potential.
 
+Before laying out the notation, the table below splits the 50,000 users by assignment ($T$) and exposure opportunity (`exposed = impressions > 0` — actual exposure on the treatment side, ghost-impression exposure on the control side).
+
+```{r}
+#| label: sample-structure
+#| echo: true
+exposed <- data$impressions > 0
+cells <- list(
+  data$Z == 0 & !exposed,
+  data$Z == 0 &  exposed,
+  data$Z == 1 & !exposed,
+  data$Z == 1 &  exposed
+)
+
+sample_structure <- data.frame(
+  T           = c(0, 0, 1, 1),
+  exposed     = c(FALSE, TRUE, FALSE, TRUE),
+  n           = sapply(cells, sum),
+  conversions = sapply(cells, function(i) sum(data$Y[i])),
+  conv_rate   = round(sapply(cells, function(i) mean(data$Y[i])), 4),
+  total_imps  = sapply(cells, function(i) sum(data$impressions[i])),
+  avg_imps    = round(sapply(cells, function(i) mean(data$impressions[i])), 4)
+)
+sample_structure
+```
+
+The two `exposed = FALSE` cells have zero conversions because nobody actually saw an ad in either of those groups. The (T=0, exposed=TRUE) cell is the Ghost-Ads counterfactual; it sits at almost the same size and average impression count as the (T=1, exposed=TRUE) cell, which is what lets us run a direct ATET comparison on exposed users.
+
 Let $Z_i \in \{0,1\}$ be assignment, $M_i$ be impressions (actual for $Z=1$, ghost for $Z=0$), and $Y_i \in \{0,1\}$ be purchase. Actual treatment $D_i$ is 1 only when $Z_i = 1$ and $M_i > 0$, since control users never see the ad.
 
 ```{r}
